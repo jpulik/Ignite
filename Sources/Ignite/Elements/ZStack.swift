@@ -7,66 +7,59 @@
 
 /// Creates a container that stacks its children along the z-axis (depth),
 /// with each subsequent child appearing in front of the previous one.
-public struct ZStack: BlockHTML {
+///
+/// - Note: To ensure alignment like `.bottom` works as expected,
+/// `ZStack` strips its subviews of implicit styles, such as the bottom margin
+/// automatically applied to paragraphs. All styles explicitly
+/// applied through modifiers like `.margin()` will be respected.
+public struct ZStack: HTML {
     /// The content and behavior of this HTML.
     public var body: some HTML { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
 
-    /// How many columns this should occupy when placed in a grid.
-    public var columnWidth: ColumnWidth = .automatic
-
     /// The alignment point for positioning elements within the stack.
-    private var alignment: UnitPoint
+    private var alignment: Alignment
 
     /// The child elements to be stacked.
-    private var items: [any HTML] = []
+    private var items: HTMLCollection
 
-    /// Creates a new ZStack with the specified alignment and content.
+    /// Creates a new `ZStack` with the specified alignment and content.
     /// - Parameters:
-    ///   - alignment: The point within the stack where elements should be aligned (default: .center).
+    ///   - alignment: The point within the stack where elements should be aligned. Defaults `.center`.
     ///   - items: A closure that returns the elements to be stacked.
-    public init(alignment: UnitPoint = .center, @HTMLBuilder _ items: () -> some HTML) {
-        self.items = flatUnwrap(items())
+    public init(
+        alignment: Alignment = .center,
+        @HTMLBuilder _ items: () -> some BodyElement
+    ) {
+        self.items = HTMLCollection(items)
         self.alignment = alignment
     }
 
-    public func render(context: PublishingContext) -> String {
-        var items = [any HTML]()
+    public func markup() -> Markup {
+        var items = items.elements
 
-        for item in self.items {
-            if let container = item as? HTMLCollection {
-                items.append(contentsOf: container.elements)
-            } else {
-                items.append(item)
-            }
-        }
-
-        items.enumerated().forEach { index, item in
+        items = items.enumerated().map { index, item in
             var elementAttributes = CoreAttributes()
+            elementAttributes.append(classes: "mb-0")
             elementAttributes.append(styles: [
-                .init(name: "grid-area", value: "1/1"),
-                .init(name: "z-index", value: "\(index)"),
-                .init(name: "width", value: "fit-content"),
-                .init(name: "height", value: "fit-content"),
-                .init(name: "justify-self", value: alignment.justifySelf),
-                .init(name: "align-self", value: alignment.alignSelf)
+                .init(.position, value: "relative"),
+                .init(.gridArea, value: "1/1"),
+                .init(.zIndex, value: "\(index)")
             ])
 
-            AttributeStore.default.merge(elementAttributes, intoHTML: item.id)
+            elementAttributes.append(styles: alignment.itemAlignmentRules)
+            return item.attributes(elementAttributes)
         }
 
         var attributes = attributes
-        attributes.append(styles: .init(name: "display", value: "grid"))
+        attributes.append(styles: .init(.display, value: "grid"))
 
-        AttributeStore.default.merge(attributes, intoHTML: id)
-        attributes.tag = "div"
-
-        let content = items.map { $0.render(context: context) }.joined()
-        return attributes.description(wrapping: content)
+        let contentHTML = items.map { $0.markupString() }.joined()
+        return Markup("<div\(attributes)>\(contentHTML)</div>")
     }
 }

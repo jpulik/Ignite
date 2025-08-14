@@ -6,40 +6,38 @@
 //
 
 /// Renders text with emphasis, which usually means italics.
-public struct Emphasis: InlineHTML {
+public struct Emphasis: InlineElement {
     /// The content and behavior of this HTML.
-    public var body: some HTML { self }
+    public var body: some InlineElement { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
 
     /// The content you want to render with emphasis.
-    var content: any InlineHTML
+    private var content: any InlineElement
 
     /// Creates a new `Emphasis` instance using an inline element builder
     /// of content to display.
     /// - Parameter content: The content to render with emphasis.
     public init(
-        @InlineHTMLBuilder content: () -> some InlineHTML
+        @InlineElementBuilder content: () -> some InlineElement
     ) {
         self.content = content()
     }
 
     /// Creates a new `Emphasis` instance using a single inline element.
-    /// - Parameter content: The content to render with emphasis.
-    public init(_ singleElement: any InlineHTML) {
+    /// - Parameter singleElement: The content to render with emphasis.
+    public init(_ singleElement: any InlineElement) {
         self.content = singleElement
     }
 
     /// Renders this element using publishing context passed in.
-    /// - Parameter context: The current publishing context.
     /// - Returns: The HTML for this element.
-    public func render(context: PublishingContext) -> String {
-        var attributes = attributes
-        attributes.tag = "em"
-        return attributes.description(wrapping: content.render(context: context))
+    public func markup() -> Markup {
+        let contentHTML = content.markupString()
+        return Markup("<em\(attributes)>\(contentHTML)</em>")
     }
 }

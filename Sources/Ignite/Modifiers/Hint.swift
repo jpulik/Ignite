@@ -5,50 +5,35 @@
 // See LICENSE for license information.
 //
 
-/// A modifier that adds tooltips to HTML elements
-struct HintModifier: HTMLModifier {
-    /// The tooltip text to display
-    private let text: String
+private func hintData(text: String) -> [Attribute] {
+    [.init(name: "bs-toggle", value: "tooltip"),
+     .init(name: "bs-title", value: text)]
+}
 
-    /// Whether the tooltip contains HTML
-    private let isHTML: Bool
+private func hintData(html: String) -> [Attribute] {
+    [.init(name: "bs-toggle", value: "tooltip"),
+     .init(name: "bs-title", value: html),
+     .init(name: "bs-html", value: "true")]
+}
 
-    /// Creates a new hint modifier with plain text
-    /// - Parameter text: The text to show in the tooltip
-    init(text: String) {
-        self.text = text
-        self.isHTML = false
-    }
+private func hintData(markdown: String) -> [Attribute] {
+    let parser = MarkdownToHTML(markdown: markdown, removeTitleFromBody: true)
+    let cleanedHTML = parser.body.replacing(#/<\/?p>/#, with: "")
+    return hintData(html: cleanedHTML)
+}
 
-    /// Creates a new hint modifier with HTML content
-    /// - Parameter html: The HTML to show in the tooltip
-    init(html: String) {
-        self.text = html
-        self.isHTML = true
-    }
+@MainActor private func hintModifier(
+    data: [Attribute],
+    content: any HTML
+) -> any HTML {
+    data.reduce(content) { $0.data($1.name, $1.value!) }
+}
 
-    /// Creates a new hint modifier with Markdown content
-    /// - Parameter markdown: The Markdown text to parse
-    init(markdown: String) {
-        let parser = MarkdownToHTML(markdown: markdown, removeTitleFromBody: true)
-        // Remove any <p></p> tags to retain styling
-        self.text = parser.body.replacing(#/<\/?p>/#, with: "")
-        self.isHTML = true
-    }
-
-    /// Applies tooltip attributes to the provided HTML content
-    /// - Parameter content: The HTML element to modify
-    /// - Returns: The modified HTML with tooltip applied
-    func body(content: some HTML) -> any HTML {
-        var modified = content.data("bs-toggle", "tooltip")
-            .data("bs-title", text)
-
-        if isHTML {
-            modified.data("bs-html", "true")
-        }
-
-        return modified
-    }
+@MainActor private func hintModifier(
+    data: [Attribute],
+    content: any InlineElement
+) -> any InlineElement {
+    data.reduce(content) { $0.data($1.name, $1.value!) }
 }
 
 public extension HTML {
@@ -56,43 +41,43 @@ public extension HTML {
     /// - Parameter text: The text to show in the tooltip.
     /// - Returns: A modified copy of the element with tooltip attached
     func hint(text: String) -> some HTML {
-        modifier(HintModifier(text: text))
+        AnyHTML(hintModifier(data: hintData(text: text), content: self))
     }
 
     /// Creates a HTML tooltip for this element.
     /// - Parameter html: The HTML to show in the tooltip.
     /// - Returns: A modified copy of the element with tooltip attached
     func hint(html: String) -> some HTML {
-        modifier(HintModifier(html: html))
+        AnyHTML(hintModifier(data: hintData(html: html), content: self))
     }
 
     /// Creates a Markdown tooltip for this element.
     /// - Parameter markdown: The Markdown text to parse.
     /// - Returns: A modified copy of the element with tooltip attached
     func hint(markdown: String) -> some HTML {
-        modifier(HintModifier(markdown: markdown))
+        AnyHTML(hintModifier(data: hintData(markdown: markdown), content: self))
     }
 }
 
-public extension InlineHTML {
+public extension InlineElement {
     /// Creates a plain-text tooltip for this element.
     /// - Parameter text: The text to show in the tooltip.
     /// - Returns: A modified copy of the element with tooltip attached
-    func hint(text: String) -> some InlineHTML {
-        modifier(HintModifier(text: text))
+    func hint(text: String) -> some InlineElement {
+        AnyInlineElement(hintModifier(data: hintData(text: text), content: self))
     }
 
     /// Creates a HTML tooltip for this element.
     /// - Parameter html: The HTML to show in the tooltip.
     /// - Returns: A modified copy of the element with tooltip attached
-    func hint(html: String) -> some InlineHTML {
-        modifier(HintModifier(html: html))
+    func hint(html: String) -> some InlineElement {
+        AnyInlineElement(hintModifier(data: hintData(html: html), content: self))
     }
 
     /// Creates a Markdown tooltip for this element.
     /// - Parameter markdown: The Markdown text to parse.
     /// - Returns: A modified copy of the element with tooltip attached
-    func hint(markdown: String) -> some InlineHTML {
-        modifier(HintModifier(markdown: markdown))
+    func hint(markdown: String) -> some InlineElement {
+        AnyInlineElement(hintModifier(data: hintData(markdown: markdown), content: self))
     }
 }

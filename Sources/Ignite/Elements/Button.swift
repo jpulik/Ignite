@@ -6,10 +6,7 @@
 //
 
 /// A clickable button with a label and styling.
-public struct Button: BlockHTML, InlineHTML {
-    /// How many columns this should occupy when placed in a section or form.
-    public var columnWidth: ColumnWidth = .automatic
-
+public struct Button: InlineElement, FormItem {
     /// Controls the display size of buttons. Medium is the default.
     public enum Size: String, CaseIterable {
         case small, medium, large
@@ -33,10 +30,10 @@ public struct Button: BlockHTML, InlineHTML {
     }
 
     /// The content and behavior of this HTML.
-    public var body: some HTML { self }
+    public var body: some InlineElement { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
@@ -51,42 +48,56 @@ public struct Button: BlockHTML, InlineHTML {
     var role = Role.default
 
     /// Elements to render inside this button.
-    var label: any HTML
+    var label: any InlineElement
+
+    /// The icon element to display before the title.
+    var systemImage: String?
+
+    /// Whether the button is disabled and cannot be interacted with.
+    private var isDisabled = false
 
     /// Creates a button with no label. Used in some situations where
     /// exact styling is performed by Bootstrap, e.g. in Carousel.
     public init() {
-        self.label = EmptyHTML()
+        self.label = EmptyInlineElement()
     }
 
     /// Creates a button with a label.
     /// - Parameter label: The label text to display on this button.
-    public init(_ label: some InlineHTML) {
+    public init(_ label: some InlineElement) {
         self.label = label
     }
 
     /// Creates a button from a more complex piece of HTML.
     /// - Parameter label: An inline element builder of all the content
     /// for this button.
-    public init(@InlineHTMLBuilder label: @escaping () -> some InlineHTML) {
+    public init(@InlineElementBuilder label: @escaping () -> some InlineElement) {
         self.label = label()
     }
 
     /// Creates a button with a label.
-    /// - Parameter label: The label text to display on this button.
+    /// - Parameters:
+    ///   - title: The label text to display on this button.
+    ///   - systemImage: An image name chosen from https://icons.getbootstrap.com.
+    ///   - actions: An element builder that returns an array of actions to run when this button is pressed.
     /// - actions: An element builder that returns an array of actions to run when this button is pressed.
-    public init(_ label: String, @ActionBuilder actions: () -> [Action]) {
-        self.label = label
+    public init(
+        _ title: String,
+        systemImage: String? = nil,
+        @ActionBuilder actions: () -> [Action] = { [] }
+    ) {
+        self.label = title
+        self.systemImage = systemImage
         addEvent(name: "onclick", actions: actions())
     }
 
     /// Creates a button with a label and actions to run when it's pressed.
     /// - Parameters:
-    ///   - label: The label text to display on this button.
     ///   - actions: An element builder that returns an array of actions to run when this button is pressed.
+    ///   - label: The label text to display on this button.
     public init(
-        @InlineHTMLBuilder _ label: @escaping () -> some InlineHTML,
-        @ActionBuilder actions: () -> [Action]
+        @ActionBuilder actions: () -> [Action],
+        @InlineElementBuilder label: @escaping () -> some InlineElement
     ) {
         self.label = label()
         addEvent(name: "onclick", actions: actions())
@@ -119,6 +130,15 @@ public struct Button: BlockHTML, InlineHTML {
         return copy
     }
 
+    /// Disables this button.
+    /// - Parameter disabled: Whether the button should be disabled.
+    /// - Returns: A new `Button` instance with the updated disabled state.
+    public func disabled(_ disabled: Bool = true) -> Self {
+        var copy = self
+        copy.isDisabled = disabled
+        return copy
+    }
+
     /// Returns an array containing the correct CSS classes to style this button
     /// based on the role and size passed in. This is used for buttons, links, and
     /// dropdowns, which is why it's shared.
@@ -126,7 +146,7 @@ public struct Button: BlockHTML, InlineHTML {
     ///   - role: The role we are styling.
     ///   - size: The size we are styling.
     /// - Returns: The CSS classes to apply for this button
-    public static func classes(forRole role: Role, size: Size) -> [String] {
+    static func classes(forRole role: Role, size: Size) -> [String] {
         var outputClasses = ["btn"]
 
         switch size {
@@ -149,37 +169,40 @@ public struct Button: BlockHTML, InlineHTML {
     }
 
     /// Adds the correct ARIA attribute for Close buttons, if needed.
-    public static func aria(forRole role: Role) -> AttributeValue? {
+    static func aria(forRole role: Role) -> Attribute? {
         switch role {
         case .close:
-            AttributeValue(name: "label", value: "Close")
+            Attribute(name: "label", value: "Close")
         default:
             nil
         }
     }
 
     /// Renders this element using publishing context passed in.
-    /// - Parameter context: The current publishing context.
     /// - Returns: The HTML for this element.
-    public func render(context: PublishingContext) -> String {
+    public func markup() -> Markup {
         var buttonAttributes = attributes
             .appending(classes: Button.classes(forRole: role, size: size))
             .appending(aria: Button.aria(forRole: role))
-        let output = HTMLCollection(label).render(context: context)
-        buttonAttributes.tag = "button type=\"\(type.htmlName)\""
-        buttonAttributes.closingTag = "button"
-        return buttonAttributes.description(wrapping: output)
+
+        if isDisabled {
+            buttonAttributes.append(customAttributes: .disabled)
+        }
+
+        var labelHTML = ""
+        if let systemImage, !systemImage.isEmpty {
+            labelHTML = "<i class=\"bi bi-\(systemImage)\"></i> "
+        }
+        labelHTML += label.markupString()
+        return Markup("<button type=\"\(type.htmlName)\"\(buttonAttributes)>\(labelHTML)</button>")
     }
 }
 
-extension Button {
+public extension Button {
     /// Adjusts the number of columns assigned to this element.
     /// - Parameter width: The new number of columns to use.
     /// - Returns: A copy of the current element with the adjusted column width.
-    public func width(_ width: Int) -> Self {
-        var copy = self
-        copy.columnWidth = .count(width)
-        copy.class("w-100")
-        return copy
+    func width(_ width: Int) -> some InlineElement {
+        self.class("w-100", ColumnWidth.count(width).className)
     }
 }

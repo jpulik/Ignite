@@ -12,53 +12,100 @@
 ///
 /// **Note**: A 12-column grid is the default, but you can adjust that downwards
 /// by using the `columns()` modifier.
-public struct Grid: BlockHTML {
+public struct Grid: HTML {
     /// The content and behavior of this HTML.
     public var body: some HTML { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
-
-    /// How many columns this should occupy when placed in a grid.
-    public var columnWidth = ColumnWidth.automatic
 
     /// How many columns this should be divided into
     var columnCount: Int?
 
     /// The amount of space between elements.
-    private var spacingAmount: SpacingType?
+    private var spacingAmount: SpacingType = .semantic(.none)
 
-    /// The items to display in this section.
-    private var items: [any HTML]
+    /// The alignment of the items within the grid.
+    private var alignment: Alignment = .center
 
-    /// Creates a new `Section` object using a block element builder
-    /// that returns an array of items to use in this section.
+    /// The items to display in this grid.
+    private var items: HTMLCollection
+
+    /// Creates a new `Grid` object using a block element builder
+    /// that returns an array of items to use in this grid.
     /// - Parameters:
-    ///   - spacing: The number of pixels between each element. Default is nil.
-    ///   - items: The items to use in this section.
-    public init(spacing: Int? = nil, @HTMLBuilder items: () -> some HTML) {
-        self.items = flatUnwrap(items())
-        if let spacing {
-            self.spacingAmount = .exact(spacing)
-        }
+    ///   - alignment: The alignment of items in the grid. Defaults to `.center`.
+    ///   - spacing: The number of pixels between each element.
+    ///   - items: The items to use in this grid.
+    public init(
+        alignment: Alignment = .center,
+        spacing: Int,
+        @HTMLBuilder items: () -> some BodyElement
+    ) {
+        self.items = HTMLCollection(items)
+        self.alignment = alignment
+        self.spacingAmount = .exact(spacing)
     }
 
-    /// Creates a new `Section` object using a block element builder
-    /// that returns an array of items to use in this section.
+    /// Creates a new `Grid` object using a block element builder
+    /// that returns an array of items to use in this grid.
     /// - Parameters:
-    ///   - spacing: The predefined size between each element.
-    ///   - items: The items to use in this section.
-    public init(spacing: SpacingAmount, @HTMLBuilder items: () -> some HTML) {
-        self.items = flatUnwrap(items())
+    ///   - alignment: The alignment of items in the grid. Defaults to `.center`.
+    ///   - spacing: The predefined size between each element. Defaults to `.none`.
+    ///   - items: The items to use in this grid.
+    public init(
+        alignment: Alignment = .center,
+        spacing: SpacingAmount = .medium,
+        @HTMLBuilder items: () -> some BodyElement
+    ) {
+        self.items = HTMLCollection(items)
+        self.alignment = alignment
         self.spacingAmount = .semantic(spacing)
     }
 
-    /// Adjusts the number of columns that can be fitted into this section.
+    /// Creates a new grid from a collection of items, along with a function that converts
+    /// a single object from the collection into one grid column.
+    /// - Parameters:
+    ///   - items: A sequence of items you want to convert into columns.
+    ///   - alignment: The alignment of items in the grid. Defaults to `.center`.
+    ///   - spacing: The number of pixels between each element.
+    ///   - content: A function that accepts a single value from the sequence, and
+    ///     returns some HTML representing that value in the grid.
+    public init<T>(
+        _ items: any Sequence<T>,
+        alignment: Alignment = .center,
+        spacing: Int, content: (T) -> some BodyElement
+    ) {
+        self.items = HTMLCollection(items.map(content))
+        self.alignment = alignment
+        self.spacingAmount = .exact(spacing)
+    }
+
+    /// Creates a new grid from a collection of items, along with a function that converts
+    /// a single object from the collection into one grid column.
+    /// - Parameters:
+    ///   - items: A sequence of items you want to convert into columns.
+    ///   - alignment: The alignment of items in the grid. Defaults to `.center`.
+    ///   - spacing: The predefined size between each element. Defaults to `.none`
+    ///   - content: A function that accepts a single value from the sequence, and
+    ///     returns some HTML representing that value in the grid.
+    public init<T>(
+        _ items: any Sequence<T>,
+        alignment: Alignment = .center,
+        spacing: SpacingAmount = .medium,
+        content: (T) -> some BodyElement
+    ) {
+        self.items = HTMLCollection(items.map(content))
+        self.alignment = alignment
+        self.spacingAmount = .semantic(spacing)
+    }
+
+    /// Adjusts the number of columns that can be fitted into this grid.
     /// - Parameter columns: The number of columns to use
-    /// - Returns: A new `Section` instance with the updated column count.
+    /// - Returns: A new `Grid` instance with the updated column count.
     public func columns(_ columns: Int) -> Self {
         var copy = self
         copy.columnCount = columns
@@ -66,17 +113,17 @@ public struct Grid: BlockHTML {
     }
 
     /// Renders this element using publishing context passed in.
-    /// - Parameter context: The current publishing context.
     /// - Returns: The HTML for this element.
-    public func render(context: PublishingContext) -> String {
-        var sectionAttributes = attributes.appending(classes: ["row"])
+    public func markup() -> Markup {
+        var gridAttributes = attributes.appending(classes: ["row"])
+        gridAttributes.append(classes: alignment.horizontal.containerAlignmentClass)
 
         // If a column count is set, we want to use that for all
         // page sizes that are medium and above. Below that we
         // should drop down to width 1 to avoid squeezing things
         // into oblivion.
         if let columnCount {
-            sectionAttributes.append(classes: [
+            gridAttributes.append(classes: [
                 "row-cols-1",
                 "row-cols-md-\(columnCount)"
             ])
@@ -84,33 +131,45 @@ public struct Grid: BlockHTML {
 
         var gutterClass = ""
 
-        if let spacingAmount {
-            switch spacingAmount {
-            case .exact(let pixels):
-                sectionAttributes.append(styles: .init(name: .rowGap, value: "\(pixels)px"))
-            case .semantic(let amount):
-                gutterClass = "gy-\(amount.rawValue)"
-            }
+        switch spacingAmount {
+        case .exact(let pixels) where pixels != 0:
+            gridAttributes.append(styles: .init(.rowGap, value: "\(pixels)px"))
+        case .semantic(let amount) where spacingAmount != .semantic(.none):
+            gutterClass = "g-\(amount.rawValue)"
+        default: break
         }
 
         return Section {
             ForEach(items) { item in
-                if let passthrough = item as? any PassthroughHTML {
+                if let passthrough = item as? any PassthroughElement {
                     handlePassthrough(passthrough, attributes: passthrough.attributes)
-                } else if let modified = item as? ModifiedHTML,
-                          let passthrough = modified.content as? any PassthroughHTML {
+                } else if let modified = item as? AnyHTML,
+                          let passthrough = modified.wrapped as? any PassthroughElement {
                     handlePassthrough(passthrough, attributes: modified.attributes)
-                } else if let item = item as? any BlockHTML {
-                    Section(item)
-                        .class(className(for: item))
-                        .class(gutterClass)
                 } else {
-                    item
+                    handleItem(item)
+                        .class(gutterClass)
                 }
             }
         }
-        .attributes(sectionAttributes)
-        .render(context: context)
+        .attributes(gridAttributes)
+        .markup()
+    }
+
+    /// Removes a column class, if it exists, from the item and reassigns it to a wrapper.
+    private func handleItem(_ item: any BodyElement) -> some BodyElement {
+        var item = item
+        var name: String?
+        if let widthClass = item.attributes.classes.first(where: { $0.starts(with: "col-md-") }) {
+            item.attributes.remove(classes: widthClass)
+            name = scaleWidthClass(widthClass)
+        }
+
+        item = item.is(Section.self) ? item : Section(item)
+
+        return AnyHTML(item)
+            .class(name ?? "col")
+            .class(alignment.vertical.itemAlignmentClass)
     }
 
     /// Renders a group of HTML elements with consistent styling and attributes.
@@ -118,34 +177,31 @@ public struct Grid: BlockHTML {
     ///   - passthrough: The passthrough entity containing the HTML elements to render.
     ///   - attributes: HTML attributes to apply to each element in the group.
     /// - Returns: A view containing the styled group elements.
-    func handlePassthrough(_ passthrough: any PassthroughHTML, attributes: CoreAttributes) -> some HTML {
+    func handlePassthrough(_ passthrough: any PassthroughElement, attributes: CoreAttributes) -> some HTML {
         let gutterClass = if case .semantic(let amount) = spacingAmount {
             "g-\(amount.rawValue)"
         } else {
             ""
         }
-        return ForEach(passthrough.items) { item in
-            if let item = item as? any BlockHTML {
-                Section(item)
-                    .class(className(for: passthrough))
-                    .class(gutterClass)
-                    .attributes(attributes)
-            }
+
+        let collection = HTMLCollection(passthrough.items.compactMap { $0 as? any HTML })
+        return ForEach(collection) { item in
+            handleItem(item.attributes(attributes))
+                .class(gutterClass)
         }
     }
 
     /// Calculates the appropriate Bootstrap column class name for a block element.
     /// - Parameter item: The block element to calculate the class name for.
-    /// - Returns: A Bootstrap class name that represents the element's width, scaled according to the section's column count if needed.
-    private func className(for item: any BlockHTML) -> String {
-        let className: String
-        if let columnCount, case .count(let width) = item.columnWidth {
+    /// - Returns: A Bootstrap class name that represents the element's width,
+    /// scaled according to the grid's column count if needed.
+    private func scaleWidthClass(_ widthClass: String) -> String {
+        if let columnCount, let width = Int(widthClass.dropFirst("col-md-".count)) {
             // Scale the width to be relative to the new column count
             let scaledWidth = width * 12 / columnCount
             return ColumnWidth.count(scaledWidth).className
         } else {
-            className = item.columnWidth.className
+            return widthClass
         }
-        return className
     }
 }

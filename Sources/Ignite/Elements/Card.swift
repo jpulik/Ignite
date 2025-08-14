@@ -6,9 +6,9 @@
 //
 
 /// A group of information placed inside a gently rounded
-public struct Card: BlockHTML {
+public struct Card: HTML {
     /// Styling for this card.
-    public enum Style: CaseIterable {
+    public enum Style: CaseIterable, Sendable {
         /// Default styling.
         case `default`
 
@@ -70,13 +70,13 @@ public struct Card: BlockHTML {
         }
     }
 
-    enum TextAlignment: String, CaseIterable {
+    enum TextAlignment: String, CaseIterable, Sendable {
         case start = "text-start"
         case center = "text-center"
         case end = "text-end"
     }
 
-    enum VerticalAlignment: String, CaseIterable {
+    enum VerticalAlignment: String, CaseIterable, Sendable {
         case start = "align-content-start"
         case center = "align-content-center"
         case end = "align-content-end"
@@ -121,14 +121,11 @@ public struct Card: BlockHTML {
     /// The content and behavior of this HTML.
     public var body: some HTML { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
-
-    /// How many columns this should occupy when placed in a grid.
-    public var columnWidth = ColumnWidth.automatic
 
     var role = Role.default
     var style = Style.default
@@ -154,9 +151,9 @@ public struct Card: BlockHTML {
 
     public init(
         imageName: String? = nil,
-        @HTMLBuilder body: () -> some HTML,
-        @HTMLBuilder header: () -> some HTML = { EmptyHTML() },
-        @HTMLBuilder footer: () -> some HTML = { EmptyHTML() }
+        @HTMLBuilder body: () -> some BodyElement,
+        @HTMLBuilder header: () -> some BodyElement = { EmptyHTML() },
+        @HTMLBuilder footer: () -> some BodyElement = { EmptyHTML() }
     ) {
         if let imageName {
             self.image = Image(decorative: imageName)
@@ -206,20 +203,20 @@ public struct Card: BlockHTML {
         return copy
     }
 
-    public func render(context: PublishingContext) -> String {
+    public func markup() -> Markup {
         Section {
             if let image, contentPosition.addImageFirst {
                 if imageOpacity != 1 {
                     image
                         .class(contentPosition.imageClass)
-                        .style("opacity: \(imageOpacity)")
+                        .style(.opacity, imageOpacity.description)
                 } else {
                     image
                         .class(contentPosition.imageClass)
                 }
             }
 
-            if header.isEmptyHTML == false {
+            if header.isEmpty == false {
                 renderHeader()
             }
 
@@ -229,33 +226,29 @@ public struct Card: BlockHTML {
                 if imageOpacity != 1 {
                     image
                         .class(contentPosition.imageClass)
-                        .style("opacity: \(imageOpacity)")
+                        .style(.opacity, imageOpacity.description)
                 } else {
                     image
                         .class(contentPosition.imageClass)
                 }
             }
 
-            if footer.isEmptyHTML == false {
+            if footer.isEmpty == false {
                 renderFooter()
             }
         }
         .attributes(attributes)
         .class("card")
         .class(cardClasses)
-        .render(context: context)
+        .markup()
     }
 
-    private func renderHeader() -> Section {
-        Section {
-            for item in header {
-                item
-            }
-        }
-        .class("card-header")
+    private func renderHeader() -> some HTML {
+        Section(header)
+            .class("card-header")
     }
 
-    private func renderItems() -> Section {
+    private func renderItems() -> some HTML {
         Section {
             ForEach(items) { item in
                 switch item {
@@ -263,8 +256,8 @@ public struct Card: BlockHTML {
                     text.class("card-text")
                 case let text as Text:
                     text.class("card-title")
-                case let link as Link:
-                    link.class("card-link")
+                case is Link, is LinkGroup:
+                    AnyHTML(item).class("card-link")
                 case let image as Image:
                     image.class("card-img")
                 default:
@@ -275,12 +268,8 @@ public struct Card: BlockHTML {
         .class(contentPosition.bodyClasses)
     }
 
-    private func renderFooter() -> Section {
-        Section {
-            for item in footer {
-                item
-            }
-        }
-        .class("card-footer", "text-body-secondary")
+    private func renderFooter() -> some HTML {
+        Section(footer)
+            .class("card-footer", "text-body-secondary")
     }
 }

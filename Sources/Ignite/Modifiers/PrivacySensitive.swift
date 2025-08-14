@@ -6,7 +6,7 @@
 //
 
 /// Specifies what content should be encoded for privacy protection
-public enum PrivacyEncoding: String {
+public enum PrivacyEncoding: String, Sendable {
     /// Only encode the URL (default)
     case urlOnly
 
@@ -21,7 +21,7 @@ public extension Link {
     ///
     /// - Parameter encoding: Controls what content gets encoded for privacy protection
     /// - Returns: A copy of the current link with protection enabled
-    func privacySensitive(_ encoding: PrivacyEncoding = .urlOnly) -> Self {
+    func privacySensitive(_ encoding: PrivacyEncoding = .urlOnly) -> some InlineElement {
         self.customAttribute(name: "privacy-sensitive", value: encoding.rawValue)
     }
 }

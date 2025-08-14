@@ -5,6 +5,80 @@
 // See LICENSE for license information.
 //
 
+private enum AlignmentType {
+    case universal(HorizontalAlignment)
+    case responsive(HorizontalAlignment.ResponsiveAlignment)
+}
+
+@MainActor private func horizontalAlignmentModifier(
+    _ alignment: AlignmentType,
+    content: any BodyElement
+) -> any BodyElement {
+    switch alignment {
+    case .universal(let alignment):
+        content.class(alignment.rawValue)
+    case .responsive(let alignment):
+        content.class(alignment.containerAlignmentClasses)
+    }
+}
+
+@MainActor private func horizontalAlignmentModifier(
+    _ alignment: AlignmentType,
+    content: any InlineElement
+) -> any InlineElement {
+    switch alignment {
+    case .universal(let alignment):
+        content
+            .class(alignment.rawValue)
+            .style(.display, "block")
+    case .responsive(let alignment):
+        content
+            .class(alignment.containerAlignmentClasses)
+            .style(.display, "block")
+    }
+}
+
+public extension HTML {
+    /// Aligns this element using a specific alignment.
+    /// - Parameter alignment: How to align this element.
+    /// - Returns: A modified copy of the element with alignment applied
+    func horizontalAlignment(_ alignment: HorizontalAlignment) -> some HTML {
+        AnyHTML(horizontalAlignmentModifier(.universal(alignment), content: self))
+    }
+
+    /// Aligns this element using multiple responsive alignments.
+    /// - Parameter alignment: One or more alignments with optional breakpoints.
+    /// - Returns: A modified copy of the element with alignments applied
+    func horizontalAlignment(_ alignment: HorizontalAlignment.ResponsiveAlignment) -> some HTML {
+        AnyHTML(horizontalAlignmentModifier(.responsive(alignment), content: self))
+    }
+}
+
+public extension InlineElement {
+    /// Aligns this element using a specific alignment.
+    /// - Parameter alignment: How to align this element.
+    /// - Returns: A modified copy of the element with alignment applied
+    func horizontalAlignment(_ alignment: HorizontalAlignment) -> some InlineElement {
+        AnyInlineElement(horizontalAlignmentModifier(.universal(alignment), content: self))
+    }
+
+    /// Aligns this element using multiple responsive alignments.
+    /// - Parameter alignment: One or more alignments with optional breakpoints.
+    /// - Returns: A modified copy of the element with alignments applied
+    func horizontalAlignment(_ alignment: HorizontalAlignment.ResponsiveAlignment) -> some InlineElement {
+        AnyInlineElement(horizontalAlignmentModifier(.responsive(alignment), content: self))
+    }
+}
+
+public extension StyledHTML {
+    /// Aligns this element using a specific alignment.
+    /// - Parameter alignment: How to align this element.
+    /// - Returns: A modified copy of the element with alignment applied
+    func horizontalAlignment(_ alignment: HorizontalAlignment) -> Self {
+        style(alignment.itemAlignmentStyle)
+    }
+}
+
 /// Controls how elements are horizontally positioned inside their container.
 public enum HorizontalAlignment: String, Sendable, Equatable {
     /// Elements are positioned at the start of their container.
@@ -16,8 +90,8 @@ public enum HorizontalAlignment: String, Sendable, Equatable {
     /// Elements are positioned at the end of their container.
     case trailing = "text-end"
 
-    /// The Bootstrap class for flex alignment
-    var bootstrapClass: String {
+    /// The Bootstrap class for flex justify-content alignment
+    var containerAlignmentClass: String {
         switch self {
         case .leading: "justify-content-start"
         case .center: "justify-content-center"
@@ -25,65 +99,101 @@ public enum HorizontalAlignment: String, Sendable, Equatable {
         }
     }
 
-    /// Converts HorizontalAlignment to CSS justify-content values
-    var justifyContent: String {
+    var itemAlignmentStyle: InlineStyle {
         switch self {
-        case .leading: "flex-start"
-        case .center: "center"
-        case .trailing: "flex-end"
+        case .leading: .init(.alignSelf, value: "start")
+        case .center: .init(.alignSelf, value: "center")
+        case .trailing: .init(.alignSelf, value: "end")
         }
     }
 }
 
-extension HorizontalAlignment: Responsive {
-    public func responsiveClass(for breakpoint: String?) -> String {
-        let alignmentClass = rawValue.dropFirst(5) // Remove "text-" prefix
-        if let breakpoint {
-            return "text-\(breakpoint)-\(alignmentClass)"
+public extension HorizontalAlignment {
+    struct ResponsiveAlignment: Equatable {
+        /// The responsive values for different breakpoints
+        var values: ResponsiveValues<HorizontalAlignment>
+
+        /// Creates a responsive value that adapts across different screen sizes.
+        /// - Parameters:
+        ///   - xSmall: The base value, applied to all breakpoints unless overridden.
+        ///   - small: Value for small screens and up. If `nil`, inherits from smaller breakpoints.
+        ///   - medium: Value for medium screens and up. If `nil`, inherits from smaller breakpoints.
+        ///   - large: Value for large screens and up. If `nil`, inherits from smaller breakpoints.
+        ///   - xLarge: Value for extra large screens and up. If `nil`, inherits from smaller breakpoints.
+        ///   - xxLarge: Value for extra extra large screens and up. If `nil`, inherits from smaller breakpoints.
+        /// - Returns: A responsive alignment that adapts to different screen sizes.
+        public static func responsive(
+            _ xSmall: HorizontalAlignment? = nil,
+            small: HorizontalAlignment? = nil,
+            medium: HorizontalAlignment? = nil,
+            large: HorizontalAlignment? = nil,
+            xLarge: HorizontalAlignment? = nil,
+            xxLarge: HorizontalAlignment? = nil
+        ) -> ResponsiveAlignment {
+            ResponsiveAlignment(
+                values: ResponsiveValues(
+                    xSmall,
+                    small: small,
+                    medium: medium,
+                    large: large,
+                    xLarge: xLarge,
+                    xxLarge: xxLarge
+                )
+            )
         }
-        return "text-\(alignmentClass)"
-    }
-}
 
-/// Determines which elements can have horizontal alignment attached,
-public protocol HorizontalAligning: HTML { }
+        /// Generates responsive CSS class strings based on the provided prefix and breakpoint values.
+        /// - Parameter prefix: The CSS class prefix (e.g., "text" or "align-self")
+        /// - Returns: A space-separated string of CSS classes for responsive behavior
+        private func generateResponsiveClasses(prefix: String) -> String {
+            // Bootstrap's responsive classes automatically handle cascading behavior,
+            // with a class like text-md-center applying to all larger breakpoints
+            // until overridden, so our implementation removes any redundant classes
+            // for larger breakpoints that share the same value as smaller ones,
+            // generating only the minimum necessary classes.
+            let specifiedValues = values.values(cascaded: false)
 
-/// A modifier that controls horizontal alignment of HTML elements
-struct HorizontalAlignmentModifier: HTMLModifier {
-    /// The alignment to apply
-    let alignments: [ResponsiveAlignment]
+            // Handle the common empty case first
+            guard let firstElement = specifiedValues.elements.first else {
+                return ""
+            }
 
-    init(alignment: HorizontalAlignment) {
-        self.alignments = [.small(alignment)]
-    }
+            let firstBreakpoint = firstElement.key
+            let firstValue = firstElement.value
 
-    init(alignments: [ResponsiveAlignment]) {
-        self.alignments = alignments
-    }
+            // Extract the alignment value directly from the rawValue
+            let alignmentValue = firstValue.rawValue.dropFirst(5)
+            let baseClass = "\(prefix)-\(alignmentValue)"
 
-    /// Applies horizontal alignment to the provided HTML content
-    /// - Parameter content: The HTML element to modify
-    /// - Returns: The modified HTML with alignment applied
-    func body(content: some HTML) -> any HTML {
-        let classes = alignments
-            .map(\.breakpointClass)
-            .joined(separator: " ")
-        return content.class(classes)
-    }
-}
+            // If there's only one value and it's not the base value, include the infix
+            guard specifiedValues.count > 1 else {
+                return firstBreakpoint == .xSmall ?
+                    baseClass :
+                    "\(prefix)-\(firstBreakpoint.infix!)-\(alignmentValue)"
+            }
 
-public extension HorizontalAligning {
-    /// Aligns this element using a specific alignment.
-    /// - Parameter alignment: How to align this element.
-    /// - Returns: A modified copy of the element with alignment applied
-    func horizontalAlignment(_ alignment: HorizontalAlignment) -> some HTML {
-        modifier(HorizontalAlignmentModifier(alignment: alignment))
-    }
+            // First breakpoint gets base class (no prefix)
+            var classes = [baseClass]
+            var lastValue = firstValue
 
-    /// Aligns this element using multiple responsive alignments.
-    /// - Parameter alignments: One or more alignments with optional breakpoints.
-    /// - Returns: A modified copy of the element with alignments applied
-    func horizontalAlignment(_ alignments: ResponsiveAlignment...) -> some HTML {
-        modifier(HorizontalAlignmentModifier(alignments: alignments))
+            // Process remaining breakpoints
+            for element in specifiedValues.elements.dropFirst() where element.value != lastValue {
+                let alignmentValue = element.value.rawValue.dropFirst(5)
+                classes.append("\(prefix)-\(element.key.infix!)-\(alignmentValue)")
+                lastValue = element.value
+            }
+
+            return classes.joined(separator: " ")
+        }
+
+        /// Bootstrap classes for responsive text alignment of content within containers
+        var containerAlignmentClasses: String {
+            generateResponsiveClasses(prefix: "text")
+        }
+
+        /// Bootstrap classes for responsive self-alignment of items within flex containers
+        var itemAlignmentClasses: String {
+            generateResponsiveClasses(prefix: "align-self")
+        }
     }
 }

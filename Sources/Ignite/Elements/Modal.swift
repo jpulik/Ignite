@@ -8,7 +8,7 @@
 /// A modal dialog presented on top of the screen
 public struct Modal: HTML {
     /// The size of the modal. Except from the full screen modal the height is defined by the height wheras the width
-    public enum Size {
+    public enum Size: CaseIterable, Sendable {
         /// A modal dialog with a small max-width of 300px
 
         case small
@@ -42,7 +42,7 @@ public struct Modal: HTML {
         }
     }
 
-    public enum Position {
+    public enum Position: CaseIterable, Sendable {
         case top
         case center
 
@@ -59,8 +59,8 @@ public struct Modal: HTML {
     /// The content and behavior of this HTML.
     public var body: some HTML { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
@@ -77,14 +77,14 @@ public struct Modal: HTML {
 
     public init(
         id modalId: String,
-        @HTMLBuilder body: () -> some HTML,
-        @HTMLBuilder header: () -> some HTML = { EmptyHTML() },
-        @HTMLBuilder footer: () -> some HTML = { EmptyHTML() }
+        @HTMLBuilder body: () -> some BodyElement,
+        @HTMLBuilder header: () -> some BodyElement = { EmptyHTML() },
+        @HTMLBuilder footer: () -> some BodyElement = { EmptyHTML() }
     ) {
         self.htmlID = modalId
-        self.items = HTMLCollection(body)
-        self.header = HTMLCollection(header)
-        self.footer = HTMLCollection(footer)
+        self.items = HTMLCollection([body()])
+        self.header = HTMLCollection([header()])
+        self.footer = HTMLCollection([footer()])
     }
 
     /// Adjusts the size of the modal.
@@ -124,13 +124,12 @@ public struct Modal: HTML {
     }
 
     /// Renders this element using publishing context passed in.
-    /// - Parameter context: The current publishing context.
     /// - Returns: The HTML for this element.
-    public func render(context: PublishingContext) -> String {
+    public func markup() -> Markup {
         Section {
             Section {
                 Section {
-                    if !header.isEmptyHTML {
+                    if !header.isEmpty {
                         Section {
                             header
                         }
@@ -142,7 +141,7 @@ public struct Modal: HTML {
                     }
                     .class("modal-body")
 
-                    if !footer.isEmptyHTML {
+                    if !footer.isEmpty {
                         Section {
                             footer
                         }
@@ -159,8 +158,8 @@ public struct Modal: HTML {
         .class(animated ? "modal fade" : "modal")
         .tabFocus(.focusable)
         .id(htmlID)
-        .aria("labelledby", "modalLabel")
-        .aria("hidden", "true")
-        .render(context: context)
+        .aria(.labelledBy, "modalLabel")
+        .aria(.hidden, "true")
+        .markup()
     }
 }

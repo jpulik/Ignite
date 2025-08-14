@@ -12,9 +12,24 @@ import SwiftSoup
 /// elements. This allows any part of the site to reference content, add
 /// build warnings, and more.
 @MainActor
-public final class PublishingContext {
+final class PublishingContext {
+    /// The shared instance of `PublishingContext`.
+    private static var sharedContext: PublishingContext!
+
+    /// The shared instance of `PublishingContext`.
+    static var shared: PublishingContext {
+        guard let sharedContext else {
+            fatalError("""
+            PublishingContext.shared accessed before being initialized. \
+            Call PublishingContext.initialize() first.
+            """)
+        }
+
+        return sharedContext
+    }
+
     /// The site that is currently being built.
-    public var site: any Site
+    var site: any Site
 
     /// The root directory for the user's website package.
     var sourceDirectory: URL
@@ -38,13 +53,24 @@ public final class PublishingContext {
     public var currentRenderingPath: String?
 
     /// Any warnings that have been issued during a build.
-    private(set) var warnings = [String]()
+    private(set) var warnings = OrderedSet<String>()
+
+    /// Any errors that have been issued during a build.
+    private(set) var errors = [PublishingError]()
+
+    /// The current environment values for the application.
+    var environment = EnvironmentValues()
 
     /// All the Markdown content this user has inside their Content folder.
-    public private(set) var allContent = [Content]()
+    private(set) var allContent = [Article]()
 
-    /// An ordered set of syntax highlighters you want to enable for your site.
-    var highlighterLanguages = OrderedSet<HighlighterLanguage>()
+    /// An ordered set of syntax highlighters pulled from code blocks throughout the site.
+    var syntaxHighlighters = OrderedSet<HighlighterLanguage>()
+
+    /// Whether the site uses syntax highlighters.
+    var hasSyntaxHighlighters: Bool {
+        !syntaxHighlighters.isEmpty || !site.syntaxHighlighterConfiguration.languages.isEmpty
+    }
 
     /// The sitemap for this site. Yes, using an array is less efficient when
     /// using `contains()`, but it allows us to list pages in a sensible order.
@@ -60,7 +86,7 @@ public final class PublishingContext {
     ///   - file: One file from the user's package.
     ///   - buildDirectoryPath: The path where the artifacts are generated.
     ///   The default is "Build".
-    init(for site: any Site, from file: StaticString, buildDirectoryPath: String = "Build") throws {
+    private init(for site: any Site, from file: StaticString, buildDirectoryPath: String = "Build") throws {
         self.site = site
 
         let sourceBuildDirectories = try URL.selectDirectories(from: file)
@@ -71,28 +97,61 @@ public final class PublishingContext {
         fontsDirectory = sourceDirectory.appending(path: "Fonts")
         contentDirectory = sourceDirectory.appending(path: "Content")
         includesDirectory = sourceDirectory.appending(path: "Includes")
+    }
 
-        try parseContent()
+    /// Creates and sets the shared instance of `PublishingContext`
+    /// - Parameters:
+    ///   - site: The site we're currently publishing.
+    ///   - file: One file from the user's package.
+    ///   - buildDirectoryPath: The path where the artifacts are generated.
+    ///   The default is "Build".
+    /// - Returns: The shared `PublishingContext` instance.
+    @discardableResult
+    static func initialize(
+        for site: any Site,
+        from file: StaticString,
+        buildDirectoryPath: String = "Build"
+    ) throws -> PublishingContext {
+        let context = try PublishingContext(for: site, from: file, buildDirectoryPath: buildDirectoryPath)
+        sharedContext = context
+        return context
     }
 
     /// Returns all content tagged with the specified tag, or all content if the tag is nil.
     /// - Parameter tag: The tag to filter by, or nil for all content.
     /// - Returns: An array of content matching the specified tag, or all content
     /// if no tag was specified.
-    func content(tagged tag: String?) -> [Content] {
+    func content(tagged tag: String?) -> [Article] {
         if let tag {
-            allContent.filter { $0.tags.contains(tag) }
+            allContent.filter { $0.tags?.contains(tag) == true }
         } else {
             allContent
+        }
+    }
+
+    /// Converts a URL to a site-relative path string.
+    /// - Parameter url: The URL to convert.
+    /// - Returns: A string path, either preserving remote URLs or
+    /// making local URLs relative to the site root.
+    func path(for url: URL) -> String {
+        let path = url.relativeString
+        return if url.isFileURL {
+            site.url.appending(path: path).decodedPath
+        } else {
+            path
         }
     }
 
     /// Adds a warning during a site build.
     /// - Parameter message: The warning string to add.
     func addWarning(_ message: String) {
-        if warnings.contains(message) == false {
-            warnings.append(message)
-        }
+        warnings.append(message)
+    }
+
+    /// Adds an error during a site build.
+    /// - Parameter error: The error to add.
+    func addError(_ error: PublishingError) {
+        errors.append(error)
     }
 
     /// Adds one path to the sitemap.
@@ -106,92 +165,82 @@ public final class PublishingContext {
 
     /// Parses all Markdown content in the site's Content folder.
     func parseContent() throws {
-        guard let enumerator = FileManager.default.enumerator(
-            at: contentDirectory,
-            includingPropertiesForKeys: [.contentModificationDateKey, .creationDateKey]
-        ) else {
-            return
-        }
-
-        while let objectURL = enumerator.nextObject() as? URL {
-            guard objectURL.hasDirectoryPath == false else { continue }
-
-            if objectURL.pathExtension == "md" {
-                let values = try objectURL.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
-
-                let article = try Content(from: objectURL, in: self, resourceValues: values)
-
-                if article.isPublished {
-                    allContent.append(article)
-                }
+        try ContentFinder.shared.find(root: contentDirectory) { deploy in
+            let article = try Article(
+                from: deploy.url,
+                resourceValues: deploy.resourceValues,
+                deployPath: deploy.path
+            )
+            if article.isPublished {
+                allContent.append(article)
             }
+            return true // always continuing
         }
+
+        // Make content be sorted newest first by default.
+        allContent.sort(
+            by: \.date,
+            order: .reverse
+        )
     }
 
     /// Performs all steps required to publish a site.
     func publish() async throws {
-        try clearBuildFolder()
-        try await generateContent()
-        try copyResources()
-        try generateThemes(site.allThemes)
-        try generateMediaQueryCSS()
+        clearBuildFolder()
+        await generateContent()
+        copyResources()
+        generateThemes(site.allThemes)
+        generateMediaQueryCSS()
         generateAnimations()
-        try await generateTagLayouts()
-        try generateSiteMap()
-        try generateFeed()
-        try generateRobots()
+        generateSiteMap()
+        generateFeed()
+        generateRobots()
     }
 
     /// Removes all content from the Build folder, so we're okay to recreate it.
-    func clearBuildFolder() throws {
-        do {
-            // Apple's docs for fileExists() recommend _not_ to check existence and then make change to file system
-            try FileManager.default.removeItem(at: buildDirectory)
-        } catch {
-            print("Could not remove buildDirectory (\(buildDirectory)), but it will be re-created anyway.")
-        }
+    func clearBuildFolder() {
+        // Apple's docs for fileExists() recommend _not_ to check
+        // existence and then make change to the file system, so we
+        // just try our best and silently fail.
+        try? FileManager.default.removeItem(at: buildDirectory)
 
         do {
             try FileManager.default.createDirectory(at: buildDirectory, withIntermediateDirectories: true)
         } catch {
-            throw PublishingError.failedToCreateBuildDirectory(buildDirectory)
+            fatalError(.failedToCreateBuildDirectory(buildDirectory))
         }
     }
 
     /// Copies the key resources for building: user assets, Bootstrap JavaScript
     /// and CSS, icons CSS and fonts if enabled, and syntax highlighters
     /// if enabled.
-    func copyResources() throws {
-        try copyAssets()
-        try copyFonts()
+    func copyResources() {
+        copyAssets()
+        copyFonts()
 
-        if !FileManager.default.fileExists(atPath: buildDirectory.appending(path: "css/themes.min.css").path(percentEncoded: false)) {
-            try copy(resource: "css/themes.min.css")
+        let igniteCorePath = buildDirectory.appending(path: "css/ignite-core.min.css").decodedPath
+
+        if !FileManager.default.fileExists(atPath: igniteCorePath) {
+            copy(resource: "css/ignite-core.min.css")
         }
 
-        if AnimationManager.default.hasAnimations {
-            let animationsPath = buildDirectory.appending(path: "css/animations.min.css").path()
-            if !FileManager.default.fileExists(atPath: animationsPath) {
-                try copy(resource: "css/animations.min.css")
-            }
-        }
-
-        try copy(resource: "js/ignite-core.js")
+        copy(resource: "js/ignite-core.js")
 
         if site.useDefaultBootstrapURLs == .localBootstrap {
-            try copy(resource: "css/bootstrap.min.css")
-            try copy(resource: "js/bootstrap.bundle.min.js")
+            copy(resource: "css/bootstrap.min.css")
+            copy(resource: "js/bootstrap.bundle.min.js")
         }
 
         if site.builtInIconsEnabled == .localBootstrap {
-            try copy(resource: "css/bootstrap-icons.min.css")
-            try copy(resource: "fonts/bootstrap-icons.woff")
-            try copy(resource: "fonts/bootstrap-icons.woff2")
+            copy(resource: "css/bootstrap-icons.min.css")
+            copy(resource: "fonts/bootstrap-icons.woff")
+            copy(resource: "fonts/bootstrap-icons.woff2")
         }
 
-        if highlighterLanguages.isEmpty == false {
-            try copy(resource: "js/prism-core.js")
-            try copySyntaxHighlighters()
+        if hasSyntaxHighlighters {
+            copy(resource: "js/prism-core.js")
+            copy(resource: "css/prism-plugins.css")
+            copySyntaxHighlighters()
         }
     }
 
@@ -212,24 +261,25 @@ public final class PublishingContext {
     /// Writes a single string of data to a URL.
     /// - Parameters:
     ///   - string: The string to write.
-    ///   - directory: The directory to write to. This has "index.html"
+    ///   - directory: The directory to write to. This has "<filename>.html"
     ///   appended to it, so users are directed to the correct page immediately.
     ///   - priority: A priority value to control how important this content
     ///   is for the sitemap.
-    func write(_ string: String, to directory: URL, priority: Double) throws {
+    ///   - filename: The filename to use. Defaults to "index". Do not include the MIME type.
+    func write(_ string: String, to directory: URL, priority: Double?, filename: String = "index") {
         let relativePath = directory.relative(to: buildDirectory)
 
-        if siteMap.contains(relativePath) {
-            throw PublishingError.duplicateDirectory(directory)
+        if relativePath != "/" && siteMap.contains(relativePath) {
+            errors.append(PublishingError.duplicateDirectory(directory))
         }
 
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         } catch {
-            throw PublishingError.failedToCreateBuildDirectory(directory)
+            errors.append(PublishingError.failedToCreateBuildDirectory(directory))
         }
 
-        let outputURL = directory.appending(path: "index.html")
+        let outputURL = directory.appending(path: filename.appending(".html"))
         var html = string
 
         if site.prettifyHTML {
@@ -238,102 +288,23 @@ public final class PublishingContext {
 
         do {
             try html.write(to: outputURL, atomically: true, encoding: .utf8)
-            addToSiteMap(relativePath, priority: priority)
+            if let priority {
+                addToSiteMap(relativePath, priority: priority)
+            }
         } catch {
-            throw PublishingError.failedToCreateBuildFile(outputURL)
+            errors.append(PublishingError.failedToCreateBuildFile(outputURL))
         }
     }
 
-    /// Renders one static page using the correct theme, which is taken either from the
-    /// provided them or from the main site theme.
-    func render(_ page: Page, using layout: any Layout) -> String {
-        let finalLayout: any Layout
-
-        if layout is MissingLayout {
-            finalLayout = site.layout
-        } else {
-            finalLayout = layout
-        }
-
-        return PageContext.withCurrentPage(page) {
-            let values = EnvironmentValues(sourceDirectory: sourceDirectory, site: site, allContent: allContent)
-            return EnvironmentStore.update(values) {
-                finalLayout.body.render(context: self)
-            }
-        }
-    }
-
-    /// Renders a static page.
+    /// Temporarily updates the environment values for the duration of an operation.
     /// - Parameters:
-    ///   - page: The page to render.
-    ///   - isHomePage: True if this is your site's homepage; this affects the
-    ///   final path that is written to.
-    func render(_ staticLayout: any StaticLayout, isHomePage: Bool = false) throws {
-        let path = isHomePage ? "" : staticLayout.path
-        currentRenderingPath = isHomePage ? "/" : staticLayout.path
-
-        let values = EnvironmentValues(sourceDirectory: sourceDirectory, site: site, allContent: allContent)
-        let body = EnvironmentStore.update(values) {
-            staticLayout.body
-        }
-
-        let page = Page(
-            title: staticLayout.title,
-            description: staticLayout.description,
-            url: site.url.appending(path: path),
-            image: staticLayout.image,
-            body: body
-        )
-
-        let outputString = render(page, using: staticLayout.parentLayout)
-        let outputDirectory = buildDirectory.appending(path: path)
-        try write(outputString, to: outputDirectory, priority: isHomePage ? 1 : 0.9)
-    }
-
-    /// Renders one piece of Markdown content.
-    /// - Parameter content: The content to render.
-    func render(_ content: Content) throws {
-        let layout = try layout(for: content)
-
-        let body = ContentContext.withCurrentContent(content) {
-            Section(context: self, items: [layout.body])
-        }
-
-        currentRenderingPath = content.path
-
-        let page = Page(
-            title: content.title,
-            description: content.description,
-            url: site.url.appending(path: content.path),
-            image: content.image.flatMap { URL(string: $0) },
-            body: body
-        )
-
-        let outputString = render(page, using: layout.parentLayout)
-        let outputDirectory = buildDirectory.appending(path: content.path)
-        try write(outputString, to: outputDirectory, priority: 0.8)
-    }
-
-    /// Locates the best layout to use for a piece of Markdown content. Layouts
-    /// are specified using YAML front matter, but if none are found then the first
-    /// layout in your site's `layouts` property is used.
-    /// - Parameter content: The content that is being rendered.
-    /// - Returns: The correct `ContentPage` instance to use for this content.
-    func layout(for content: Content) throws -> any ContentLayout {
-        if let contentLayout = content.layout {
-            for layout in site.contentLayouts {
-                let layoutName = String(describing: type(of: layout))
-
-                if layoutName == contentLayout {
-                    return layout
-                }
-            }
-
-            throw PublishingError.missingNamedLayout(contentLayout)
-        } else if let defaultLayout = site.contentLayouts.first {
-            return defaultLayout
-        } else {
-            throw PublishingError.missingDefaultLayout
-        }
+    ///   - environment: The new environment values to use
+    ///   - operation: A closure that executes with the temporary environment
+    /// - Returns: The value returned by the operation
+    func withEnvironment<T>(_ environment: EnvironmentValues, operation: () -> T) -> T {
+        let previous = self.environment
+        self.environment = environment
+        defer { self.environment = previous }
+        return operation()
     }
 }

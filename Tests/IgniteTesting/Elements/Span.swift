@@ -12,20 +12,19 @@ import Testing
 
 /// Tests for the `Span` element.
 @Suite("Span Tests")
-@MainActor struct SpanTests {
-    let publishingContext = ElementTest.publishingContext
-
-    @Test("Single Element Test", arguments: ["This is a test", "Another test"])
-    func test_singleElement(spanText: String) async throws {
+@MainActor class SpanTests: IgniteTestSuite {
+    @Test("Single Element", arguments: ["This is a test", "Another test"])
+    func singleElement(spanText: String) async throws {
         let element = Span(spanText)
-        let output = element.render(context: publishingContext)
+        let output = element.markupString()
 
         #expect(output == "<span>\(spanText)</span>")
     }
-    @Test("Builder Test", arguments: ["This is a test", "Another test"])
-    func test_builder(spanText: String) async throws {
+
+    @Test("Builder", arguments: ["This is a test", "Another test"])
+    func builder(spanText: String) async throws {
         let element = Span { spanText }
-        let output = element.render(context: publishingContext)
+        let output = element.markupString()
 
         #expect(output == "<span>\(spanText)</span>")
     }

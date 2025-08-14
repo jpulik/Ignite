@@ -5,6 +5,8 @@
 // See LICENSE for license information.
 //
 
+import Foundation
+
 /// A type that represents a source for a font, including its name, weight, style, and location.
 ///
 /// Use `FontSource` to define where font files can be found and their properties. For example:
@@ -42,12 +44,12 @@ public struct FontSource: Hashable, Equatable, Sendable {
     let variant: Font.Variant
 
     /// The URL where the font file can be found, if it's a web font.
-    let url: URL?
+    let url: URL
 
     /// Creates a font source with a remote URL.
     /// - Parameters:
-    ///   - weight: The weight of this font variant, defaulting to regular.
-    ///   - style: The style of this font variant, defaulting to normal.
+    ///   - weight: The weight of this font variant, defaulting to `.regular`.
+    ///   - variant: The style of this font variant, defaulting to `.normal`.
     ///   - url: The URL where the font file can be found.
     public init(
         weight: Font.Weight = .regular,
@@ -57,19 +59,5 @@ public struct FontSource: Hashable, Equatable, Sendable {
         self.url = url
         self.weight = weight
         self.variant = variant
-    }
-
-    /// Creates a font source for a local font file.
-    /// - Parameters:
-    ///   - name: The name of the font file or family.
-    ///   - weight: The weight of this font variant, defaulting to regular.
-    ///   - style: The style of this font variant, defaulting to normal.
-    init(
-        weight: Font.Weight = .regular,
-        variant: Font.Variant = .normal
-    ) {
-        self.weight = weight
-        self.variant = variant
-        self.url = nil
     }
 }

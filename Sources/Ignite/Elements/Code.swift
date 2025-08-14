@@ -8,18 +8,23 @@
 /// An inline snippet of programming code, embedded inside a larger part
 /// of your page. For dedicated code blocks that sit on their own line, use
 /// `CodeBlock` instead.
-public struct Code: InlineHTML {
+///
+/// - Important: If your code contains angle brackets (`<`...`>`), such as Swift generics,
+/// the prettifier will interpret these as HTML tags and break the code's formatting.
+/// To avoid this issue, either set your site’s `shouldPrettify` property to `false`,
+/// or replace `<` and `>` with their character entity references, `&lt;` and `&gt;` respectively.
+public struct Code: InlineElement {
     /// The content and behavior of this HTML.
-    public var body: some HTML { self }
+    public var body: some InlineElement { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
 
     /// The code to display.
-    var content: String
+    private var content: String
 
     /// Creates a new `Code` instance from the given content.
     /// - Parameter content: The code you want to render.
@@ -28,11 +33,8 @@ public struct Code: InlineHTML {
     }
 
     /// Renders this element using publishing context passed in.
-    /// - Parameter context: The current publishing context.
     /// - Returns: The HTML for this element.
-    public func render(context: PublishingContext) -> String {
-        var attributes = attributes
-        attributes.tag = "code"
-        return attributes.description(wrapping: content)
+    public func markup() -> Markup {
+        Markup("<code\(attributes)>\(content)</code>")
     }
 }

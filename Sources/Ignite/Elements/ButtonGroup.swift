@@ -7,24 +7,21 @@
 
 /// A container that automatically adjusts the styling for buttons it contains so
 /// that they sit more neatly together.
-public struct ButtonGroup: BlockHTML {
+public struct ButtonGroup: HTML {
     /// The content and behavior of this HTML.
     public var body: some HTML { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
 
-    /// How many columns this should occupy when placed in a grid.
-    public var columnWidth = ColumnWidth.automatic
-
     /// A required screen reader description for this element.
-    var accessibilityLabel: String
+    private var accessibilityLabel: String
 
     /// The buttons that should be displayed in this gorup.
-    var content: [Button]
+    private var content: HTMLCollection
 
     /// Creates a new `ButtonGroup` from the accessibility label and an
     /// element builder that must return the buttons to use.
@@ -37,19 +34,16 @@ public struct ButtonGroup: BlockHTML {
         @ElementBuilder<Button> _ content: () -> [Button]
     ) {
         self.accessibilityLabel = accessibilityLabel
-        self.content = content()
+        self.content = HTMLCollection(content())
     }
 
     /// Renders this element using publishing context passed in.
-    /// - Parameter context: The current publishing context.
     /// - Returns: The HTML for this element.
-    public func render(context: PublishingContext) -> String {
-        Section {
-            content.map { $0.render(context: context) }.joined()
-        }
-        .class("btn-group")
-        .aria("label", accessibilityLabel)
-        .customAttribute(name: "role", value: "group")
-        .render(context: context)
+    public func markup() -> Markup {
+        Section(content)
+            .class("btn-group")
+            .aria(.label, accessibilityLabel)
+            .customAttribute(name: "role", value: "group")
+            .markup()
     }
 }

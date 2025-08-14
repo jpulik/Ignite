@@ -6,7 +6,7 @@
 //
 
 /// Used to create tabulated data on a page.
-public struct Table: BlockHTML {
+public struct Table: HTML {
     /// Styling options for tables.
     public enum Style {
         /// All table rows and columns look the same. The default.
@@ -24,20 +24,20 @@ public struct Table: BlockHTML {
     /// The content and behavior of this HTML.
     public var body: some HTML { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
 
-    /// How many columns this should occupy when placed in a grid.
-    public var columnWidth = ColumnWidth.automatic
+    /// What text to use for an optional filter text field.
+    var filterTitle: String?
 
     /// The rows that are inside this table.
-    var rows: [Row]
+    var rows: HTMLCollection
 
     /// An optional array of header to use at the top of this table.
-    var header: [any HTML]?
+    var header: HTMLCollection?
 
     /// The styling to apply to this table. Defaults to `.plain`.
     var style = Style.plain
@@ -52,23 +52,71 @@ public struct Table: BlockHTML {
 
     /// Creates a new `Table` instance from an element builder that returns
     /// an array of rows to use in the table.
-    /// - Parameter rows: An array of rows to use in the table.
-    public init(@ElementBuilder<Row> rows: () -> [Row]) {
-        self.rows = rows()
+    /// - Parameters:
+    ///   - filterTitle: When provided, this is used to for the placeholder in a
+    ///     text field that filters the table data.
+    ///   - rows: An array of rows to use in the table.
+    public init(
+        filterTitle: String? = nil,
+        @ElementBuilder<Row> rows: () -> [Row]
+    ) {
+        self.filterTitle = filterTitle
+        self.rows = HTMLCollection(rows())
     }
 
     /// Creates a new `Table` instance from an element builder that returns
     /// an array of rows to use in the table, and also a page element builder
     /// that returns an array of headers to use at the top of the table.
     /// - Parameters:
+    ///   - filterTitle: When provided, this is used to for the placeholder in a
+    ///     text field that filters the table data.
     ///   - rows: An array of rows to use in the table.
     ///   - header: An array of headers to use at the top of the table.
     public init(
+        filterTitle: String? = nil,
         @ElementBuilder<Row> rows: () -> [Row],
+        @HTMLBuilder header: () -> some BodyElement
+    ) {
+        self.filterTitle = filterTitle
+        self.rows = HTMLCollection(rows())
+        self.header = HTMLCollection(header)
+    }
+
+    /// Creates a new `Table` instance from a collection of items, along with a function
+    /// that converts a single object from the collection into one row in the table.
+    /// - Parameters:
+    ///   - items: A sequence of items you want to convert into rows.
+    ///   - filterTitle: When provided, this is used to for the placeholder in a
+    ///     text field that filters the table data.
+    ///   - content: A function that accepts a single value from the sequence, and
+    /// returns a row representing that value in the table.
+    public init<T>(
+        _ items: any Sequence<T>,
+        filterTitle: String? = nil,
+        content: (T) -> Row
+    ) {
+        self.filterTitle = filterTitle
+        self.rows = HTMLCollection(items.map(content))
+    }
+
+    /// Creates a new `Table` instance from a collection of items, along with a function
+    /// that converts a single object from the collection into one row in the table.
+    /// - Parameters:
+    ///   - items: A sequence of items you want to convert into rows.
+    ///   - filterTitle: When provided, this is used to for the placeholder in a
+    ///     text field that filters the table data.
+    ///   - content: A function that accepts a single value from the sequence, and
+    ///     returns a row representing that value in the table.
+    ///   - header: An array of headers to use at the top of the table.
+    public init<T>(
+        _ items: any Sequence<T>,
+        filterTitle: String? = nil,
+        content: (T) -> Row,
         @HTMLBuilder header: () -> some HTML
     ) {
-        self.rows = rows()
-        self.header = flatUnwrap(header())
+        self.filterTitle = filterTitle
+        self.rows = HTMLCollection(items.map(content))
+        self.header = HTMLCollection(header)
     }
 
     /// Adjusts the style of this table.
@@ -99,9 +147,8 @@ public struct Table: BlockHTML {
     }
 
     /// Renders this element using publishing context passed in.
-    /// - Parameter context: The current publishing context.
     /// - Returns: The HTML for this element.
-    public func render(context: PublishingContext) -> String {
+    public func markup() -> Markup {
         var tableAttributes = attributes.appending(classes: ["table"])
 
         if hasBorderEnabled {
@@ -117,7 +164,18 @@ public struct Table: BlockHTML {
             tableAttributes.append(classes: ["table-striped-columns"])
         }
 
-        var output = "<table\(tableAttributes.description())>"
+        var output = ""
+
+        if let filterTitle {
+            tableAttributes.id = "table-\(UUID().uuidString.truncatedHash)"
+            output += """
+            <input class=\"form-control mb-2\" type=\"text\" \
+            placeholder=\"\(filterTitle)\" \
+            onkeyup=\"igniteFilterTable(this.value, '\(tableAttributes.id)')\">
+            """
+        }
+
+        output += "<table\(tableAttributes)>"
 
         if let caption {
             output += "<caption>\(caption)</caption>"
@@ -125,16 +183,16 @@ public struct Table: BlockHTML {
 
         if let header {
             let headerHTML = header.map {
-                "<th>\($0.render(context: context))</th>"
+                "<th>\($0.markupString())</th>"
             }.joined()
 
             output += "<thead><tr>\(headerHTML)</tr></thead>"
         }
 
         output += "<tbody>"
-        output += rows.render(context: context)
+        output += rows.markupString()
         output += "</tbody>"
         output += "</table>"
-        return output
+        return Markup(output)
     }
 }

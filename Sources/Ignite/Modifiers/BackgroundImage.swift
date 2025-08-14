@@ -5,33 +5,6 @@
 // See LICENSE for license information.
 //
 
-/// A modifier that applies background images to HTML elements.
-struct BackgroundImageModifier: HTMLModifier {
-    /// The path to the image.
-    var imagePath: String
-
-    /// The content mode to use for sizing the image.
-    var contentMode: BackgroundImageContentMode
-
-    /// The position of the image within the element's frame.
-    var position: BackgroundPosition
-
-    /// Whether the image should be repeated.
-    var repeats: Bool
-
-    /// Applies the background image to the provided HTML content.
-    /// - Parameter content: The HTML content to modify
-    /// - Returns: The modified HTML content with background image applied
-    func body(content: some HTML) -> any HTML {
-        content.style(
-            "background-image: url('\(imagePath)')",
-            "background-size: \(contentMode.css)",
-            "background-repeat: \(repeats ? "repeat" : "no-repeat")",
-            "background-position: \(position.css)"
-        )
-    }
-}
-
 public extension HTML {
     /// Applies a background image to the element.
     /// - Parameters:
@@ -46,12 +19,12 @@ public extension HTML {
         position: BackgroundPosition = .center,
         repeats: Bool = false
     ) -> some HTML {
-        modifier(BackgroundImageModifier(
-            imagePath: image,
-            contentMode: contentMode,
-            position: position,
-            repeats: repeats
-        ))
+        self.style(
+            .init(.backgroundImage, value: "url('\(image)')"),
+            .init(.backgroundSize, value: contentMode.css),
+            .init(.backgroundRepeat, value: repeats ? "repeat" : "no-repeat"),
+            .init(.backgroundPosition, value: position.css)
+        )
     }
 }
 
@@ -60,7 +33,7 @@ protocol CSSRepresentable {
 }
 
 /// The possible background sizes
-public enum BackgroundImageContentMode: CSSRepresentable {
+public enum BackgroundImageContentMode: CSSRepresentable, Sendable {
     /// This is the default value. The background image is displayed at its original size.
     case original
 
@@ -85,7 +58,7 @@ public enum BackgroundImageContentMode: CSSRepresentable {
 }
 
 /// A type representing the background image position within the page element
-public struct BackgroundPosition: CSSRepresentable {
+public struct BackgroundPosition: CSSRepresentable, Sendable {
 
     /// The possible absolute values going from left to right and top to bottom.
     /// For example an offset from the top edge of `10px` means 10 px down from the top.
@@ -104,7 +77,6 @@ public struct BackgroundPosition: CSSRepresentable {
             case .percent(let value): "\(value)%"
             }
         }
-
     }
 
     /// The possible horizontal alignment values.

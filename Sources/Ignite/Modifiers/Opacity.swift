@@ -5,53 +5,77 @@
 // See LICENSE for license information.
 //
 
-/// A modifier that applies opacity styling to HTML elements
-struct OpacityModifier: HTMLModifier {
-    /// The opacity value between 0% (transparent) and 100% (opaque)
-    private let percentage: Percentage?
+import Foundation
 
-    /// The opacity value between 0 (transparent) and 1.0 (opaque)
-    private let doubleValue: Double?
+private enum OpacityType {
+    case double(Double), percent(Percentage)
+}
 
-    /// Creates a new opacity modifier
-    /// - Parameter value: The opacity value to apply (0-100%)
-    init(value: Percentage) {
-        self.percentage = value
-        self.doubleValue = nil
-    }
-
-    /// Creates a new opacity modifier
-    /// - Parameter value: The opacity value to apply (0-1.0)
-    init(value: Double) {
-        self.doubleValue = value
-        self.percentage = nil
-    }
-
-    /// Applies opacity styling to the provided HTML content
-    /// - Parameter content: The HTML element to modify
-    /// - Returns: The modified HTML with opacity applied
-    func body(content: some HTML) -> any HTML {
-        if let percentage, percentage != 100% {
-            content.style("opacity: \(percentage.value)")
-        } else if let doubleValue, doubleValue != 1 {
-            content.style("opacity: \(doubleValue.formatted())")
-        }
+@MainActor private func opacityModifier(
+    _ opacity: OpacityType,
+    content: any HTML
+) -> any HTML {
+    switch opacity {
+    case .double(let double) where double < 1:
+        content.style(.opacity, double.formatted(.nonLocalizedDecimal(places: 3)))
+    case .percent(let percentage) where percentage < 100%:
+        content.style(.opacity, percentage.value.formatted(.nonLocalizedDecimal(places: 3)))
+    default:
         content
     }
 }
 
-extension HTML {
+@MainActor private func opacityModifier(
+    _ opacity: OpacityType,
+    content: any InlineElement
+) -> any InlineElement {
+    switch opacity {
+    case .double(let double) where double < 1:
+        content.style(.opacity, double.formatted(.nonLocalizedDecimal(places: 3)))
+    case .percent(let percentage) where percentage < 100%:
+        content.style(.opacity, percentage.value.formatted(.nonLocalizedDecimal(places: 3)))
+    default:
+        content
+    }
+}
+
+public extension HTML {
     /// Adjusts the opacity of an element.
     /// - Parameter value: A value between 0% (fully transparent) and 100% (fully opaque).
     /// - Returns: A modified copy of the element with opacity applied
-    public func opacity(_ value: Percentage) -> some HTML {
-        modifier(OpacityModifier(value: value))
+    func opacity(_ value: Percentage) -> some HTML {
+        AnyHTML(opacityModifier(.percent(value), content: self))
     }
 
     /// Adjusts the opacity of an element.
     /// - Parameter value: A value between 0 (fully transparent) and 1.0 (fully opaque).
     /// - Returns: A modified copy of the element with opacity applied
-    public func opacity(_ value: Double) -> some HTML {
-        modifier(OpacityModifier(value: value))
+    func opacity(_ value: Double) -> some HTML {
+        AnyHTML(opacityModifier(.double(value), content: self))
+    }
+}
+
+public extension InlineElement {
+    /// Adjusts the opacity of an element.
+    /// - Parameter value: A value between 0% (fully transparent) and 100% (fully opaque).
+    /// - Returns: A modified copy of the element with opacity applied
+    func opacity(_ value: Percentage) -> some InlineElement {
+        AnyInlineElement(opacityModifier(.percent(value), content: self))
+    }
+
+    /// Adjusts the opacity of an element.
+    /// - Parameter value: A value between 0 (fully transparent) and 1.0 (fully opaque).
+    /// - Returns: A modified copy of the element with opacity applied
+    func opacity(_ value: Double) -> some InlineElement {
+        AnyInlineElement(opacityModifier(.double(value), content: self))
+    }
+}
+
+public extension StyledHTML {
+    /// Adjusts the opacity of an element.
+    /// - Parameter value: A value between 0% (fully transparent) and 100% (fully opaque).
+    /// - Returns: A modified copy of the element with opacity applied
+    func opacity(_ percentage: Percentage) -> Self {
+        self.style(.opacity, String(percentage.value))
     }
 }

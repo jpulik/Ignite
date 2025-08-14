@@ -5,63 +5,53 @@
 // See LICENSE for license information.
 //
 
-/// A modifier that applies border styling to HTML elements.
-struct BorderModifier: HTMLModifier {
-    /// The color of the border.
-    var color: Color
+@MainActor private func borderModifier(
+    color: Color,
+    width: Double,
+    style: BorderStyle,
+    edges: Edge,
+    content: any HTML
+) -> any HTML {
+    let styles = createBorderStyles(color: color, width: width, style: style, edges: edges)
+    return content.style(styles)
+}
 
-    /// The width of the border in pixels.
-    var width: Double
+@MainActor private func borderModifier(
+    color: Color,
+    width: Double,
+    style: BorderStyle,
+    edges: Edge,
+    content: any InlineElement
+) -> any InlineElement {
+    let styles = createBorderStyles(color: color, width: width, style: style, edges: edges)
+    return content.style(styles)
+}
 
-    /// The style of the border.
-    var style: BorderStyle
-
-    /// The radii for rounding corners.
-    var cornerRadii: CornerRadii
-
-    /// Which edges should have borders.
-    var edges: Edge
-
-    /// Applies the border styling to the provided HTML content.
-    /// - Parameter content: The HTML content to modify
-    /// - Returns: The modified HTML content with border styling applied
-    func body(content: some HTML) -> any HTML {
-        var modified = content
-
-        // Apply border styles based on edges
-        if edges.contains(.all) {
-            modified.style("border: \(width)px \(style.rawValue) \(color)")
-        } else {
-            if edges.contains(.leading) {
-                modified.style("border-left: \(width)px \(style.rawValue) \(color)")
-            }
-            if edges.contains(.trailing) {
-                modified.style("border-right: \(width)px \(style.rawValue) \(color)")
-            }
-            if edges.contains(.top) {
-                modified.style("border-top: \(width)px \(style.rawValue) \(color)")
-            }
-            if edges.contains(.bottom) {
-                modified.style("border-bottom: \(width)px \(style.rawValue) \(color)")
-            }
+private func createBorderStyles(
+    color: Color,
+    width: Double,
+    style: BorderStyle,
+    edges: Edge
+) -> [InlineStyle] {
+    var styles = [InlineStyle]()
+    if edges.contains(.all) {
+        styles.append(.init(.border, value: "\(width)px \(style.rawValue) \(color)"))
+    } else {
+        if edges.contains(.leading) {
+            styles.append(.init(.borderLeft, value: "\(width)px \(style.rawValue) \(color)"))
         }
-
-        // Apply corner radii
-        if cornerRadii.topLeading > 0 {
-            modified.style("border-top-left-radius: \(cornerRadii.topLeading)px")
+        if edges.contains(.trailing) {
+            styles.append(.init(.borderRight, value: "\(width)px \(style.rawValue) \(color)"))
         }
-        if cornerRadii.topTrailing > 0 {
-            modified.style("border-top-right-radius: \(cornerRadii.topTrailing)px")
+        if edges.contains(.top) {
+            styles.append(.init(.borderTop, value: "\(width)px \(style.rawValue) \(color)"))
         }
-        if cornerRadii.bottomLeading > 0 {
-            modified.style("border-bottom-left-radius: \(cornerRadii.bottomLeading)px")
+        if edges.contains(.bottom) {
+            styles.append(.init(.borderBottom, value: "\(width)px \(style.rawValue) \(color)"))
         }
-        if cornerRadii.bottomTrailing > 0 {
-            modified.style("border-bottom-right-radius: \(cornerRadii.bottomTrailing)px")
-        }
-
-        return modified
     }
+
+    return styles
 }
 
 public extension HTML {
@@ -70,48 +60,67 @@ public extension HTML {
     ///   - color: The color of the border
     ///   - width: The width in pixels
     ///   - style: The border style
-    ///   - cornerRadii: The corner rounding radii
     ///   - edges: Which edges should have borders
     /// - Returns: A modified element with the border applied
     func border(
         _ color: Color,
         width: Double = 1,
         style: BorderStyle = .solid,
-        cornerRadii: CornerRadii = CornerRadii(),
         edges: Edge = .all
     ) -> some HTML {
-        modifier(BorderModifier(
+        return AnyHTML(borderModifier(
             color: color,
             width: width,
             style: style,
-            cornerRadii: cornerRadii,
-            edges: edges)
-        )
+            edges: edges,
+            content: self
+        ))
     }
 }
 
-public extension InlineHTML {
+public extension InlineElement {
     /// Adds a border to this element.
     /// - Parameters:
     ///   - color: The color of the border
     ///   - width: The width in pixels
     ///   - style: The border style
-    ///   - cornerRadii: The corner rounding radii
     ///   - edges: Which edges should have borders
     /// - Returns: A modified element with the border applied
     func border(
         _ color: Color,
         width: Double = 1,
         style: BorderStyle = .solid,
-        cornerRadii: CornerRadii = CornerRadii(),
         edges: Edge = .all
-    ) -> some InlineHTML {
-        modifier(BorderModifier(
+    ) -> some InlineElement {
+        return AnyInlineElement(borderModifier(
             color: color,
             width: width,
             style: style,
-            cornerRadii: cornerRadii,
-            edges: edges)
-        )
+            edges: edges,
+            content: self
+        ))
+    }
+}
+
+public extension StyledHTML {
+    /// Adds a border to this element.
+    /// - Parameters:
+    ///   - color: The color of the border
+    ///   - width: The width in pixels
+    ///   - style: The border style
+    ///   - edges: Which edges should have borders
+    /// - Returns: A modified element with the border applied
+    func border(
+        _ color: Color,
+        width: Double = 1,
+        style: BorderStyle = .solid,
+        edges: Edge = .all
+    ) -> Self {
+        return self.style(createBorderStyles(
+            color: color,
+            width: width,
+            style: style,
+            edges: edges
+        ))
     }
 }

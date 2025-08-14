@@ -5,45 +5,70 @@
 // See LICENSE for license information.
 //
 
-/// A container element that wraps its children in a `div` element.
+/// A container element that groups its children together.
 ///
-/// Use `Section` when you want to group elements together and have them rendered
-/// within a containing HTML `div`. This is useful for applying shared styling,
-/// creating layout structures, or logically grouping related content.
+/// When initialized with just content, the section wraps its children in a `<div>`.
+/// When initialized with a header and content, the section wraps its children in a `<section>`.
 ///
 /// - Note: Unlike ``Group``, modifiers applied to a `Section` affect the
-///         containing `div` element rather than being propagated to child elements.
-public struct Section: BlockHTML {
+///         containing element rather than being propagated to child elements.
+public struct Section: HTML, FormItem {
     /// The content and behavior of this HTML.
     public var body: some HTML { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
 
-    /// How many columns this should occupy when placed in a grid.
-    public var columnWidth = ColumnWidth.automatic
+    /// The heading text of the section.
+    var header: String?
 
-    var items: [any HTML] = []
+    /// The heading's semantic font size.
+    var headerStyle: Font.Style = .title2
 
-    public init(@HTMLBuilder content: () -> some HTML) {
-        self.items = flatUnwrap(content())
+    var content: any BodyElement
+
+    init(_ content: any BodyElement) {
+        self.content = content
     }
 
-    public init(_ items: any HTML, background: Color? = nil) {
-        self.items = flatUnwrap(items)
+    /// Creates a section that renders as a `div` element.
+    /// - Parameter content: The content to display within this section.
+    public init(
+        @HTMLBuilder content: () -> some BodyElement
+    ) {
+        self.content = content()
     }
 
-    init(context: PublishingContext, items: [any HTML]) {
-        self.items = flatUnwrap(items)
+    /// Creates a section that renders as a `section` element with a heading.
+    /// - Parameters:
+    ///   - header: The text to display as the section's heading
+    ///   - content: The content to display within this section
+    public init(
+        _ header: String,
+        @HTMLBuilder content: () -> some BodyElement
+    ) {
+        self.content = content()
+        self.header = header
     }
 
-    public func render(context: PublishingContext) -> String {
-        let content = items.map { $0.render(context: context) }.joined()
-        var attributes = attributes
-        attributes.tag = "div"
-        return attributes.description(wrapping: content)
+    /// Adjusts the semantic importance of the section's header by changing its font style.
+    /// - Parameter fontStyle: The font style to apply to the header
+    /// - Returns: A section with the modified header style
+    public func headerProminence(_ fontStyle: Font.Style) -> Self {
+        var copy = self
+        copy.headerStyle = fontStyle
+        return copy
+    }
+
+    public func markup() -> Markup {
+        let contentHTML = content.markupString()
+        if let header = header {
+            let headerHTML = Text(header).fontStyle(headerStyle).markupString()
+            return Markup("<section\(attributes)>\(headerHTML + contentHTML)</section>")
+        }
+        return Markup("<div\(attributes)>\(contentHTML)</div>")
     }
 }

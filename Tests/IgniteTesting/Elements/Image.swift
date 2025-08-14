@@ -12,25 +12,29 @@ import Testing
 
 /// Tests for the `Image` element.
 @Suite("Image Tests")
-@MainActor struct ImageTests {
-    let publishingContext = ElementTest.publishingContext
+@MainActor class ImageTests: IgniteTestSuite {
+    @Test("Local Image", arguments: ["/images/example.jpg"], ["Example image"])
+    func named(file: String, description: String) async throws {
+        let element = Image(file, description: description)
+        let output = element.markupString()
 
-    @Test("Image Test", arguments: ["/images/example.jpg"], ["Example image"])
-    func test_named(image: String, description: String) async throws {
-        let element = Image(image, description: description)
-        let output = element.render(context: publishingContext)
-        let normalizedOutput = ElementTest.normalizeHTML(output)
-
-        #expect(
-            normalizedOutput
-                == "<img alt=\"Example image\" src=\"/images/example.jpg\"/>")
+        let expectedPath = PublishingContext.shared.path(for: URL(string: file)!)
+        #expect(output == "<img src=\"\(expectedPath)\" alt=\"\(description)\" />")
     }
-    @Test("Icon Image Test", arguments: ["browser-safari"], ["Safari logo"])
-    func test_icon(systemName: String, description: String) async throws {
-        let element = Image(
-            systemName: systemName, description: description)
-        let output = element.render(context: publishingContext)
 
+    @Test("Remote Image", arguments: ["https://example.com"], ["Example image"])
+    func named(url: String, description: String) async throws {
+        let element = Image(url, description: description)
+        let output = element.markupString()
+
+        let expectedPath = PublishingContext.shared.path(for: URL(string: url)!)
+        #expect(output == "<img src=\"\(expectedPath)\" alt=\"\(description)\" />")
+    }
+
+    @Test("Icon Image", arguments: ["browser-safari"], ["Safari logo"])
+    func icon(systemName: String, description: String) async throws {
+        let element = Image(systemName: systemName, description: description)
+        let output = element.markupString()
         #expect(output == "<i class=\"bi-browser-safari\"></i>")
     }
 }

@@ -16,38 +16,35 @@
 ///         attributes to multiple elements without affecting the document
 ///         structure. If you need a containing `div` element, use
 ///         ``Section`` instead.
-public struct Group: PassthroughHTML {
-    /// The content and behavior of this HTML.
-    public var body: some HTML { self }
-
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+public struct Group: HTML, PassthroughElement {
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
 
-    /// How many columns this should occupy when placed in a grid.
-    public var columnWidth = ColumnWidth.automatic
+    /// The child elements contained within this group.
+    var items: HTMLCollection
 
-    var items: [any HTML] = []
+    public var body: some HTML { self }
 
-    public init(@HTMLBuilder _ content: () -> some HTML) {
-        self.items = flatUnwrap(content())
+    /// Creates a new group containing the given HTML content.
+    /// - Parameter content: A closure that creates the HTML content.
+    public init(@HTMLBuilder content: () -> some HTML) {
+        self.items = HTMLCollection(content)
     }
 
-    public init(_ items: any HTML) {
-        self.items = flatUnwrap(items)
+    /// Creates a new group containing the given HTML content.
+    /// - Parameter content: The HTML content to include.
+    public init(_ content: some BodyElement) {
+        self.items = HTMLCollection([content])
     }
 
-    init(context: PublishingContext, items: [any HTML]) {
-        self.items = flatUnwrap(items)
-    }
-
-    public func render(context: PublishingContext) -> String {
-        return items.map {
-            let item: any HTML = $0
-            AttributeStore.default.merge(attributes, intoHTML: item.id)
-            return item.render(context: context)
+    public func markup() -> Markup {
+        items.map {
+            var item: any BodyElement = $0
+            item.attributes.merge(attributes)
+            return item.markup()
         }.joined()
     }
 }

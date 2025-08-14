@@ -6,28 +6,25 @@
 //
 
 /// A block quote of text.
-public struct Quote: BlockHTML {
+public struct Quote: HTML {
     /// The content and behavior of this HTML.
     public var body: some HTML { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
-
-    /// How many columns this should occupy when placed in a grid.
-    public var columnWidth = ColumnWidth.automatic
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// The content of this quote.
-    var contents: any HTML
+    var contents: any BodyElement
 
     /// Provide details about this quote, e.g. a source name.
-    var caption: any InlineHTML
+    var caption: any InlineElement
 
     /// Create a new quote from a page element builder that returns an array
     /// of elements to display in the quote.
     /// - Parameter contents: The elements to display inside the quote.
-    public init(@HTMLBuilder contents: () -> some HTML) {
+    public init(@HTMLBuilder contents: () -> some BodyElement) {
         self.contents = contents()
-        self.caption = EmptyHTML()
+        self.caption = EmptyInlineElement()
     }
 
     /// Create a new quote from a page element builder that returns an array
@@ -39,31 +36,26 @@ public struct Quote: BlockHTML {
     /// - contents: Additional details about the quote, e.g. its source.
     public init(
         @HTMLBuilder contents: () -> some HTML,
-        @InlineHTMLBuilder caption: () -> some InlineHTML
+        @InlineElementBuilder caption: () -> some InlineElement
     ) {
         self.contents = contents()
         self.caption = caption()
     }
 
     /// Renders this element using publishing context passed in.
-    /// - Parameter context: The current publishing context.
     /// - Returns: The HTML for this element.
-    public func render(context: PublishingContext) -> String {
-        let renderedContents = contents.render(context: context)
-        let renderedCaption = caption.render(context: context)
+    public func markup() -> Markup {
         var attributes = attributes
-
-        attributes.tag = "blockquote"
         attributes.append(classes: "blockquote")
 
-        if renderedCaption.isEmpty {
-            return attributes.description(wrapping: renderedContents)
+        let contentHTML = contents.markupString()
+        let captionHTML = caption.markupString()
+
+        if captionHTML.isEmpty {
+            return Markup("<blockquote\(attributes)>\(contentHTML)</blockquote>")
         } else {
-            var footerAttributes = CoreAttributes()
-            footerAttributes.tag = "footer"
-            footerAttributes.append(classes: "blockquote-footer")
-            let footer = footerAttributes.description(wrapping: renderedCaption)
-            return attributes.description(wrapping: renderedContents + footer)
+            let footer = "<footer class=\"blockquote-footer\">\(captionHTML)</footer>"
+            return Markup("<blockquote\(attributes)>\(contentHTML + footer)</blockquote>")
         }
     }
 }

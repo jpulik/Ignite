@@ -14,12 +14,12 @@ public extension Image {
     func imageFit(
         _ fit: ImageFit = .cover,
         anchor: UnitPoint = .center
-    ) -> Self {
+    ) -> some InlineElement {
         let xPercent = Int(anchor.x * 100)
         let yPercent = Int(anchor.y * 100)
 
         return self
             .class("w-100 h-100 object-fit-\(fit.rawValue)")
-            .style("object-position: \(xPercent)% \(yPercent)%")
+            .style(.objectPosition, "\(xPercent)% \(yPercent)%")
     }
 }

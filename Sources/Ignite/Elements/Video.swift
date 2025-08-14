@@ -6,30 +6,25 @@
 //
 
 /// Shows a Video player on your page.
-public struct Video: BlockHTML, InlineHTML, LazyLoadable {
+public struct Video: InlineElement, LazyLoadable {
     /// The content and behavior of this HTML.
-    public var body: some HTML { self }
+    public var body: some InlineElement { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
 
-    /// How many columns this should occupy when placed in a grid.
-    public var columnWidth = ColumnWidth.automatic
-
     /// The files of the video to display. This should be specified relative to the
     /// root of your site, e.g. /video/outforwalk.mp4.
-    var files: [String]?
+    private var files: [String]?
 
     /// Creates one or multiple `Video` instance from the names of
     /// files contained in your site's assets. This should be specified
     /// relative to the root of your site, e.g. /video/outforwalk.mp4.
-    /// - Parameters:
-    ///   - names: The filenames of your video relative to the root of
+    /// - Parameter files: A variable number of filenames, relative to the root of
     ///   your site. e.g. /video/outforwalk.mp4.
-    ///   - fileTypes: The format of the video files.
     public init(_ files: String...) {
         self.files = files
     }
@@ -37,39 +32,32 @@ public struct Video: BlockHTML, InlineHTML, LazyLoadable {
     /// Renders user video into the current publishing context.
     /// - Parameters:
     ///   - files: The user videos to render.
-    ///   - context: The active publishing context.
     /// - Returns: The HTML for this element.
-    public func render(files: [String], into context: PublishingContext) -> String {
-        var attributes = attributes
-        attributes.tag = "video controls"
-        attributes.closingTag = "video"
+    private func render(files: [String]) -> Markup {
+        var output = "<video controls\(attributes)>"
 
-        let sources = files.compactMap { filename in
-            guard let fileType = videoType(for: filename) else { return nil }
-            var sourceAttributes = CoreAttributes()
-            sourceAttributes.selfClosingTag = "source"
-            sourceAttributes.append(customAttributes:
-                .init(name: "src", value: filename),
-                .init(name: "type", value: fileType.rawValue)
-            )
-            return sourceAttributes.description()
-        }.joined()
+        for filename in files {
+            if let fileType = videoType(for: filename) {
+                output += "<source src=\"\(filename)\" type=\"\(fileType.rawValue)\" />"
+            }
+        }
 
-        return attributes.description(wrapping: sources + "Your browser does not support the video tag.")
+        output += "Your browser does not support the video tag."
+        output += "</video>"
+        return Markup(output)
     }
 
     /// Renders this element using publishing context passed in.
-    /// - Parameter context: The current publishing context.
     /// - Returns: The HTML for this element.
-    public func render(context: PublishingContext) -> String {
+    public func markup() -> Markup {
         guard let files = self.files else {
-            context.addWarning("""
+            publishingContext.addWarning("""
             Creating video with no name should not be possible. \
             Please file a bug report on the Ignite project.
             """)
-            return ""
+            return Markup()
         }
-        return render(files: files, into: context)
+        return render(files: files)
     }
 
     // Dictionary mapping file extensions to VideoType

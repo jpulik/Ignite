@@ -5,6 +5,8 @@
 // See LICENSE for license information.
 //
 
+public typealias FontVariant = Font.Variant
+
 /// A type that represents a font configuration including style, size, and weight
 public struct Font: Hashable, Equatable, Sendable {
     /// The name of the font family, if using a custom font.
@@ -19,8 +21,8 @@ public struct Font: Hashable, Equatable, Sendable {
     /// The size of the font, if specified.
     let size: LengthUnit?
 
-    /// The responsive sizes for this font
-    let responsiveSizes: [ResponsiveFontSize]
+    /// The responsive size for this font.
+    let responsiveSize: ResponsiveValues<LengthUnit>?
 
     /// The weight (boldness) of the font.
     let weight: Font.Weight
@@ -36,7 +38,7 @@ public struct Font: Hashable, Equatable, Sendable {
     }
 
     /// An array of system fonts in order of preference.
-    public static let systemFonts = [
+    static let systemFonts = [
         "system-ui",
         "-apple-system",
         "Segoe UI",
@@ -49,7 +51,7 @@ public struct Font: Hashable, Equatable, Sendable {
     ]
 
     /// An array of monospace fonts in order of preference.
-    public static let monospaceFonts = [
+    static let monospaceFonts = [
         "SFMono-Regular",
         "Menlo",
         "Monaco",
@@ -60,16 +62,16 @@ public struct Font: Hashable, Equatable, Sendable {
     ]
 
     /// The default sans-serif system font.
-    public static let systemSansSerif = Font(name: systemFonts.joined(separator: ","), weight: .regular)
+    static let systemSansSerif = Font(name: systemFonts.joined(separator: ","), weight: .regular)
 
     /// The default monospace system font.
-    public static let systemMonospace = Font(name: monospaceFonts.joined(separator: ","), weight: .regular)
+    static let systemMonospace = Font(name: monospaceFonts.joined(separator: ","), weight: .regular)
 
     /// The default font used for body text.
-    public static let systemBodyFont = systemSansSerif
+    static let systemBodyFont = systemSansSerif
 
     /// The default font used for code blocks.
-    public static let systemCodeFont = systemMonospace
+    static let systemCodeFont = systemMonospace
 
     /// Creates a font with the specified properties.
     /// - Parameters:
@@ -84,7 +86,7 @@ public struct Font: Hashable, Equatable, Sendable {
         self.name = name
         self.sources = sources
         self.weight = weight
-        self.responsiveSizes = []
+        self.responsiveSize = nil
         self.size = nil
         self.style = nil
     }
@@ -107,21 +109,21 @@ public struct Font: Hashable, Equatable, Sendable {
     }
 
     init(
-        name: String,
+        name: String?,
         style: Font.Style = .body,
-        sizes: [ResponsiveFontSize],
+        size: Responsive.Size,
         weight: Weight = .regular
     ) {
         self.name = name
         self.style = style
-        self.responsiveSizes = sizes
+        self.responsiveSize = size.values
         self.weight = weight
         self.size = nil
         self.sources = []
     }
 
     init(
-        name: String,
+        name: String?,
         style: Font.Style = .body,
         size: LengthUnit? = nil,
         weight: Font.Weight = .regular
@@ -131,7 +133,7 @@ public struct Font: Hashable, Equatable, Sendable {
         self.size = size
         self.weight = weight
         self.sources = []
-        self.responsiveSizes = []
+        self.responsiveSize = nil
     }
 
     /// Creates a system font with the specified style.
@@ -142,7 +144,7 @@ public struct Font: Hashable, Equatable, Sendable {
         _ style: Font.Style,
         weight: Font.Weight = .regular
     ) -> Font {
-        Font(name: "", style: style, weight: weight)
+        Font(name: nil, style: style, weight: weight)
     }
 
     /// Creates a system font with the specified style.
@@ -155,7 +157,7 @@ public struct Font: Hashable, Equatable, Sendable {
         size: LengthUnit,
         weight: Font.Weight = .regular
     ) -> Font {
-        Font(name: "", style: style, size: size, weight: weight)
+        Font(name: nil, style: style, size: size, weight: weight)
     }
 
     /// Creates a system font with the specified style.
@@ -168,20 +170,7 @@ public struct Font: Hashable, Equatable, Sendable {
         size: Int,
         weight: Font.Weight = .regular
     ) -> Font {
-        Font(name: "", style: style, size: .px(size), weight: weight)
-    }
-
-    /// Creates a system font with responsive sizing.
-    /// - Parameter style: The semantic level of the font. Defaults to `.body`.
-    /// - Parameter sizes: One or more sizes that change at different breakpoints.
-    /// - Parameter weight: The font weight to use.
-    /// - Returns: A Font instance configured with responsive sizing.
-    public static func system(
-        _ style: Font.Style = .body,
-        sizes: ResponsiveFontSize...,
-        weight: Font.Weight = .regular
-    ) -> Font {
-        Font(name: "", style: style, sizes: sizes, weight: weight)
+        Font(name: nil, style: style, size: .px(size), weight: weight)
     }
 
     /// Creates a custom font with the specified name and size.
@@ -216,19 +205,23 @@ public struct Font: Hashable, Equatable, Sendable {
         Font(name: name, style: style, size: .px(size), weight: weight)
     }
 
-    /// Creates a custom font with the specified name and size.
+    /// Creates a custom font with the specified name and style.
     /// - Parameters:
     ///   - name: The name of the font file including its extension.
     ///   - style: The semantic level of the font. Defaults to `.body`.
-    ///   - sizes: One or more sizes that change at different breakpoints
     ///   - weight: The weight (boldness) of the font.
     /// - Returns: A Font instance configured with the custom font.
     public static func custom(
         _ name: String,
         style: Font.Style = .body,
-        sizes: ResponsiveFontSize...,
         weight: Font.Weight = .regular
     ) -> Font {
-        Font(name: name, style: style, sizes: sizes, weight: weight)
+        Font(name: name, style: style, size: nil, weight: weight)
+    }
+}
+
+extension Font: CustomStringConvertible {
+    public var description: String {
+        name ?? "System"
     }
 }

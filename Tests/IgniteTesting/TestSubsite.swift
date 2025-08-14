@@ -11,7 +11,7 @@ import Ignite
 struct TestSubsite: Site {
     var name = "My Test Subsite"
     var titleSuffix = " - My Test Subsite"
-    var url = URL(static: "https://www.yoursite.com/subsite")
+    var url = URL(static: "https://www.example.com/subsite")
 
     var builtInIconsEnabled: BootstrapOptions = .localBootstrap
 
@@ -19,12 +19,11 @@ struct TestSubsite: Site {
     var layout = EmptyLayout()
 }
 
-/// An example page  used in tests.
-struct TestSubsitePage: StaticLayout {
+/// An example page used in tests.
+struct TestSubsitePage: StaticPage {
     var title = "Subsite Home"
 
     var body: some HTML {
         Text("Example subsite text")
     }
 }
-

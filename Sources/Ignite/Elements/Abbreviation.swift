@@ -1,48 +1,48 @@
 //
-//  Abbreviation.swift
-//  Ignite
-//  https://www.github.com/twostraws/Ignite
-//  See LICENSE for license information.
+// Abbreviation.swift
+// Ignite
+// https://www.github.com/twostraws/Ignite
+// See LICENSE for license information.
 //
 
 /// Renders an abbreviation.
-public struct Abbreviation: InlineHTML {
+public struct Abbreviation: InlineElement {
     /// The content and behavior of this HTML.
-    public var body: some HTML { self }
+    public var body: some InlineElement { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
 
     /// The contents of this abbreviation.
-    public var contents: any InlineHTML
+    public var contents: any InlineElement
 
     /// Creates a new `Abbreviation` instance.
     /// - Parameter abbreviation: The abbreviation.
     /// - Parameter description: The description of the abbreviation.
     public init(_ abbreviation: String, description: String) {
         contents = abbreviation
-        let customAttribute = AttributeValue(name: "title", value: description)
-        attributes.customAttributes.insert(customAttribute)
+        let customAttribute = Attribute(name: "title", value: description)
+        attributes.append(customAttributes: customAttribute)
     }
 
     /// Creates a new `Abbreviation` instance using an inline element builder
     /// that returns an array of content to place inside.
-    /// - Parameter description: The description of the abbreviation.
-    public init(_ description: String, @InlineHTMLBuilder content: () -> some InlineHTML) {
+    /// - Parameters:
+    ///   - description: The description of the abbreviation.
+    ///   - content: The elements to place inside the abbreviation.
+    public init(_ description: String, @InlineElementBuilder content: () -> some InlineElement) {
         contents = content()
-        let customAttribute = AttributeValue(name: "title", value: description)
-        attributes.customAttributes.insert(customAttribute)
+        let customAttribute = Attribute(name: "title", value: description)
+        attributes.append(customAttributes: customAttribute)
     }
 
     /// Renders this element using publishing context passed in.
-    /// - Parameter context: The current publishing context.
     /// - Returns: The HTML for this element.
-    public func render(context: PublishingContext) -> String {
-        var attributes = attributes
-        attributes.tag = "abbr"
-        return attributes.description(wrapping: contents.render(context: context))
+    public func markup() -> Markup {
+        let contentHTML = contents.markupString()
+        return Markup("<abbr\(attributes)>\(contentHTML)</abbr>")
     }
 }

@@ -18,7 +18,7 @@ import Foundation
 extension Process {
     /// Runs a command, optionally followed by a second command.
     /// - Parameters:
-    ///   - arguments: The full command to execute. This must be passed as a string
+    ///   - command: The full command to execute. This must be passed as a string
     ///   even though an array might seem better, because `bash -c` executes the
     ///   command as the current user, and that also needs the whole command to be
     ///   passed as a single string rather than an array that is more common.
@@ -31,7 +31,7 @@ extension Process {
         then subsequentCommand: String = ""
     ) throws -> (output: String, error: String) {
         let process = Process()
-        process.launchPath = "/bin/bash"
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
         process.arguments = ["-c"] + [command]
 
         let output = Pipe()

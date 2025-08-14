@@ -6,9 +6,9 @@
 //
 
 /// A column inside a table row.
-public struct Column: HTML, HorizontalAligning {
+public struct Column: HTML {
     /// How to vertically align the contents of this column.
-    public enum VerticalAlignment: String {
+    public enum VerticalAlignment: String, Sendable, CaseIterable {
         /// Align contents to the top of the column.
         case top
 
@@ -22,8 +22,8 @@ public struct Column: HTML, HorizontalAligning {
     /// The content and behavior of this HTML.
     public var body: some HTML { self }
 
-    /// The unique identifier of this HTML.
-    public var id = UUID().uuidString.truncatedHash
+    /// The standard set of control attributes for HTML elements.
+    public var attributes = CoreAttributes()
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
@@ -41,8 +41,8 @@ public struct Column: HTML, HorizontalAligning {
     /// Creates a new column from a page element builder of items.
     /// - Parameter items: A page element builder that returns the items
     /// for this column.
-    public init(@HTMLBuilder items: () -> some HTML) {
-        self.items = HTMLCollection(items())
+    public init(@HTMLBuilder items: () -> some BodyElement) {
+        self.items = HTMLCollection(items)
     }
 
     /// Adjusts how many columns in a row this column should span.
@@ -64,16 +64,15 @@ public struct Column: HTML, HorizontalAligning {
     }
 
     /// Renders this element using publishing context passed in.
-    /// - Parameter context: The current publishing context.
     /// - Returns: The HTML for this element.
-    public func render(context: PublishingContext) -> String {
+    public func markup() -> Markup {
         var columnAttributes = attributes
 
         if verticalAlignment != .top {
             columnAttributes.append(classes: ["align-\(verticalAlignment.rawValue)"])
         }
-        columnAttributes.tag = "td colspan=\"\(columnSpan)\""
-        columnAttributes.closingTag = "td"
-        return columnAttributes.description(wrapping: HTMLCollection(items).render(context: context))
+        columnAttributes.append(customAttributes: .init(name: "colspan", value: columnSpan.formatted()))
+        let itemHTML = items.markupString()
+        return Markup("<td\(columnAttributes)>\(itemHTML)</td>")
     }
 }

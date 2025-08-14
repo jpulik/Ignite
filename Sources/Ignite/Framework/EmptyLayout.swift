@@ -7,10 +7,8 @@
 
 /// A layout that applies almost no styling.
 public struct EmptyLayout: Layout {
-    public var body: some HTML {
-        HTMLDocument {
-            HTMLBody(for: page)
-        }
+    public var body: some Document {
+        Body()
     }
 
     public init() {}

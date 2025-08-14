@@ -36,25 +36,24 @@ ignite new ExampleSite
 
 Once installed, the command-line tool is helpful for running a local web server for testing and for building your project.
 
-> [!Tip]
-> Using the Ignite tool to run a local web server is the best way to preview your site.
-
-Alternatively, you can bring Ignite into an existing project using Swift Package Manager by adding a package dependency for <https://github.com/twostraws/Ignite>.
-
-Once that completes, import Ignite into your Swift code wherever needed:
-
-```swift
-import Ignite
+To build your example site, run these commands:
+```shell
+cd ExampleSite
+ignite build
 ```
 
+That creates a new folder called Build with the site files. Now you can preview it. (For more details on how to build, see "Using the command-line tool" below.)
+
 ## Important: Previewing your site
+
+> [!Tip]
+> Using the Ignite tool to run a local web server is the best way to preview your site.
 
 Once you've built your site and are ready to see how it looks, do *not* just double-click one of the files in Finder. This will open the file directly in your browser, which means it won't know how to locate the rest of your site – the stylesheets, JavaScript code, etc – so it will not display correctly.
 
 Instead, the best way to preview your site is using the Ignite CLI tool, which you installed in Getting Started above:
 
 - Run `ignite run --preview` to preview your site and open it in your web browser.
-- If Ignite tells you there is already a web server running on that port, run `ignite run --preview --force`.
 
 That will open your web browser straight to your site. You can then return to Xcode and make changes to your site freely – every time you press Cmd+R to build your site, you can refresh your browser to see the changes.
 
@@ -121,13 +120,13 @@ Accordion {
 It has automatic code syntax highlighting for a dozen languages:
 
 ```swift
-CodeBlock(language: "swift", """
+CodeBlock(.swift) { """
 struct ContentView: View {
     var body: some View {
         Text("Hello, Swift!")
     }
 }
-""")
+""" }
 ```
 
 ![Swift code with syntax highlighting.](images/code.png)
@@ -151,6 +150,14 @@ Ignite sites are just Swift package, but they use a specific folder structure to
 
 This folder structure is already in place in the [Ignite Starter Template](https://github.com/twostraws/IgniteStarter) repository, and I recommend you start with that.
 
+Alternatively, you can bring Ignite into an existing project using Swift Package Manager by adding a package dependency for <https://github.com/twostraws/Ignite>.
+
+Once that completes, import Ignite into your Swift code wherever needed:
+
+```swift
+import Ignite
+```
+
 ## Create a layout to render Markdown files
 
 Adding Markdown files to **Content** will render these to HTML pages and include them in **Build** with their respective folder structure, minus the **Content** part.
@@ -162,7 +169,7 @@ For example, adding a new file called `apps.md` to **Content** means having this
 │   └── apps.md
 ```
 
-And it results inn this **Build** structure:
+And it results in this **Build** structure:
 
 ```bash
 ├── Build
@@ -174,38 +181,38 @@ And it results inn this **Build** structure:
 
 **A precondition for this to work is to have a layout available to render your content.** If you don't have a valid layout in place, Ignite will issue a warning saying "Your site must provide at least one layout in order to render Markdown."
 
-You can create custom content layouts by making types conform to the `ContentLayout` protocol, which will automatically be given a `content` property to access the content it is displaying. For example:
+You can create custom layouts for articles by making types conform to the `ArticlePage` protocol, which will automatically be given an `article` property to access the content it is displaying. For example:
 
 ```swift
 import Foundation
 import Ignite
 
-struct CustomContentLayout: ContentLayout {
+struct CustomArticleLayout: ArticlePage {
     var body: some HTML {
-        Text(content.title)
+        Text(article.title)
             .font(.title1)
 
-        if let image = content.image {
-            Image(image, description: content.imageDescription)
+        if let image = article.image {
+            Image(image, description: article.imageDescription)
                 .resizable()
                 .cornerRadius(20)
                 .frame(maxHeight: 300)
         }
 
-        if content.hasTags {
+        if let tags = article.tags {
             Section {
-                Text("Tagged with: \(content.tags.joined(separator: ", "))")
+                Text("Tagged with: \(tags.joined(separator: ", "))")
 
-                Text("\(content.estimatedWordCount) words; \(content.estimatedReadingMinutes) minutes to read.")
+                Text("\(article.estimatedWordCount) words; \(article.estimatedReadingMinutes) minutes to read.")
             }
         }
 
-        Text(content.body)
+        Text(article.text)
     }
 }
 ```
 
-Once you've defined a custom layout, you should add it to your `Site` struct. This can be done by adding this new layout to the `layouts` property of the site, like this:
+Once you've defined a custom layout, you should add it to your `Site` struct. This can be done by adding this new layout to the `articlePages` property of the site, like this:
 
 ```swift
 struct ExampleSite: Site {    
@@ -216,12 +223,13 @@ struct ExampleSite: Site {
     var layout = MyLayout()
 
     /* This part adds the custom layout */
-    var layouts: [any ContentLayout] {
-        CustomContentLayout()
+    var articlePages: [any ArticlePage] {
+        CustomArticleLayout()
     }
 }
 ```
 
+The `Site` protocol provides sensible defaults for most properties, allowing you to focus on implementing only the customizations your site needs. As shown in the above, only a few properties like `name`, `url`, `homePage`, and `layout` require explicit implementation.
 
 ## Using the command-line tool
 
@@ -267,9 +275,13 @@ That will launch a local web server you should use to preview your site, and als
 
 | Website                | Repository                                |
 |------------------------|-------------------------------------------|
+| [Lighting Ignite on Fire](https://jptoro.dev/lighting-ignite-on-fire/) | [GitHub](https://github.com/JPToroDev/Lighting-Ignite-on-Fire) |
 | [jcalderita Portfolio](https://jcalderita.com) | [GitHub](https://github.com/jcalderita/portfolio-web-ignite) |
 | [Fotogroep de Gender](http://www.vdhamer.com/fgDeGender) | [GitHub](https://github.com/vdhamer/Photo-Club-Hub-HTML) |
 | [sookim-1's T.W.L](https://sookim-1.github.io) | [GitHub](https://github.com/sookim-1/blog-website) |
+| [try! Swift Tokyo](https://tryswift.jp/en/) | [GitHub](https://github.com/tryswift/try-swift-tokyo) |
+| [Tomo Codes](https://tomo.codes) | [GitHub](https://github.com/TomaszLizer/TomoCodes) |
+| [Ryan Token](https://www.ryantoken.com) | [GitHub](https://github.com/r-token/ryantoken.com-v4-ignite) |
 
 
 ## Contributing
@@ -279,7 +291,7 @@ I welcome all contributions, whether that's adding new tests, fixing up existing
 - You must comment your code thoroughly, using documentation comments or regular comments as applicable.
 - Please ensure you run SwiftLint in the Sources directory, and fix all outstanding issues.
 - All code must be licensed under the MIT license so it can benefit the most people.
-- Ensure you build IgniteSamples using your  modified copy of Ignite, and compare it to [the live version](https://github.com/twostraws/IgniteSamples).
+- Ensure you build IgniteSamples using your modified copy of Ignite, and compare it to [the live version](https://github.com/twostraws/IgniteSamples).
 - If you create a new element, please consider adding it to the IgniteSamples repository, so folks can see it more easily.
 
 
