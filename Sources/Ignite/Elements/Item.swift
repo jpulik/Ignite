@@ -12,6 +12,8 @@ public struct Item: HTML {
 
     /// The standard set of control attributes for HTML elements.
     public var attributes = CoreAttributes()
+    
+    public var itemID: String?
 
     /// Whether this HTML belongs to the framework.
     public var isPrimitive: Bool { true }
@@ -45,10 +47,12 @@ public struct Item: HTML {
     ///   - content: A block element builder that creates the contents
     ///   for this accordion item.
     public init(
+        id: String? = nil,
         _ header: some InlineElement,
         startsOpen: Bool = false,
         @HTMLBuilder content: () -> some HTML
     ) {
+        self.itemID = id
         self.title = header
         self.startsOpen = startsOpen
         self.contents = content()
@@ -97,16 +101,21 @@ public struct Item: HTML {
             fatalError("Accordion sections must not be rendered without a parentID and parentOpenMode in place.")
         }
 
-        let itemID = "\(parentID)-item\(UUID().uuidString.truncatedHash)"
+        var _itemID: String
+        if let itemID = self.itemID, !itemID.isEmpty {
+            _itemID = itemID
+        } else {
+            _itemID = "\(parentID)-item\(UUID().uuidString.truncatedHash)"
+        }
 
         return Section {
             Text {
                 Button(title)
                     .class("accordion-button", startsOpen ? "" : "collapsed")
                     .data("bs-toggle", "collapse")
-                    .data("bs-target", "#\(itemID)")
+                    .data("bs-target", "#\(_itemID)")
                     .aria(.expanded, startsOpen ? "true" : "false")
-                    .aria(.controls, itemID)
+                    .aria(.controls, _itemID)
             }
             .font(.title2)
             .class("accordion-header")
@@ -115,7 +124,7 @@ public struct Item: HTML {
                 Section(contents)
                     .class("accordion-body")
             }
-            .id(itemID)
+            .id(_itemID)
             .class("accordion-collapse", "collapse", startsOpen ? "show" : nil)
             .data("bs-parent", parentOpenMode == .individual ? "#\(parentID)" : "")
             .style(contentBackground == nil ? nil : .init(.background, value: contentBackground!.description))
