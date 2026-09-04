@@ -12,13 +12,29 @@ import Testing
 
 /// Tests for the `FormFieldLabel` element.
 @Suite("Form Field Label Tests")
-@MainActor
 class FormFieldLabelTests: IgniteTestSuite {
-    @Test("Basic Label")
+    @Test("Basic Label", .publishingContext())
     func basicLabel() async throws {
         let element = ControlLabel("This is a text for label")
         let output = element.markupString()
 
         #expect(output == "<label>This is a text for label</label>")
+    }
+
+    @Test("Label with inline element content", .publishingContext())
+    func labelWithInlineElementContent() async throws {
+        let element = ControlLabel(Span("Email"))
+        let output = element.markupString()
+        #expect(output == "<label><span>Email</span></label>")
+    }
+
+    @Test("Label with class attribute", .publishingContext())
+    func labelWithClassAttribute() async throws {
+        let element = ControlLabel("Name").class("form-label")
+        let output = element.markupString()
+        #expect(output.contains("class=\"form-label\""))
+        #expect(output.contains("Name"))
+        #expect(output.contains("<label"))
+        #expect(output.contains("</label>"))
     }
 }

@@ -12,9 +12,8 @@ import Testing
 
 /// Tests for the `Section` element.
 @Suite("Section Tests")
-@MainActor
 class SectionTests: IgniteTestSuite {
-    @Test("Section")
+    @Test("Section", .publishingContext())
     func section() async throws {
         let element = Section {
             Span("Hello, World!")
@@ -25,7 +24,7 @@ class SectionTests: IgniteTestSuite {
         #expect(output == "<div><span>Hello, World!</span><span>Goodbye, World!</span></div>")
     }
 
-    @Test("Section with Header")
+    @Test("Section with Header", .publishingContext())
     func sectionWithHeader() async throws {
         let element = Section("Greetings") {
             Span("Hello, World!")
@@ -42,5 +41,33 @@ class SectionTests: IgniteTestSuite {
         <span>Goodbye, World!</span>\
         </section>
         """)
+    }
+
+    @Test("Default header prominence renders as h2", .publishingContext())
+    func defaultHeaderProminence() async throws {
+        let element = Section("Default Heading") {
+            Span("Content")
+        }
+
+        let output = element.markupString()
+
+        #expect(output == """
+        <section>\
+        <h2>Default Heading</h2>\
+        <span>Content</span>\
+        </section>
+        """)
+    }
+
+    @Test("Section with ID includes id on containing element", .publishingContext())
+    func sectionWithID() async throws {
+        let element = Section {
+            Span("Content")
+        }
+        .id("my-section")
+
+        let output = element.markupString()
+
+        #expect(output == "<div id=\"my-section\"><span>Content</span></div>")
     }
 }

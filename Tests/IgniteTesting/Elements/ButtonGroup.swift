@@ -5,17 +5,57 @@
 //  See LICENSE for license information.
 //
 
-import Foundation
 import Testing
 
 @testable import Ignite
 
 /// Tests for the `ButtonGroup` element.
 @Suite("ButtonGroup Tests")
-@MainActor
 class ButtonGroupTests: IgniteTestSuite {
-    @Test("ExampleTest")
-    func example() async throws {
+    @Test("ButtonGroup renders with btn-group class", .publishingContext())
+    func hasBtnGroupClass() async throws {
+        let group = ButtonGroup(accessibilityLabel: "Actions") {
+            Button("OK")
+        }
 
+        let output = group.markupString()
+
+        #expect(output.contains(#"class="btn-group"#))
+    }
+
+    @Test("ButtonGroup renders with group role", .publishingContext())
+    func hasGroupRole() async throws {
+        let group = ButtonGroup(accessibilityLabel: "Actions") {
+            Button("OK")
+        }
+
+        let output = group.markupString()
+
+        #expect(output.contains(#"role="group""#))
+    }
+
+    @Test("ButtonGroup renders accessibility label in aria-label", .publishingContext())
+    func hasAriaLabel() async throws {
+        let group = ButtonGroup(accessibilityLabel: "Editing tools") {
+            Button("Cut")
+            Button("Copy")
+        }
+
+        let output = group.markupString()
+
+        #expect(output.contains(#"aria-label="Editing tools""#))
+    }
+
+    @Test("ButtonGroup contains rendered buttons", .publishingContext())
+    func containsButtons() async throws {
+        let group = ButtonGroup(accessibilityLabel: "Actions") {
+            Button("Save")
+            Button("Cancel")
+        }
+
+        let output = group.markupString()
+
+        #expect(output.contains("Save"))
+        #expect(output.contains("Cancel"))
     }
 }

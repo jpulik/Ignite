@@ -10,9 +10,8 @@ import Testing
 
 /// Tests for the `SubscribeForm` element.
 @Suite("Subscribe Form Tests")
-@MainActor
 class SubscribeFormTests: IgniteTestSuite {
-    @Test("Basic Subscribe Form")
+    @Test("Basic Subscribe Form", .publishingContext())
     func form() async throws {
         let element = SubscribeForm(.sendFox(listID: "myListID", formID: "myID"))
             .emailFieldLabel("MyLabel")
@@ -42,5 +41,98 @@ class SubscribeFormTests: IgniteTestSuite {
         </form>\
         <script charset="utf-8" src="https://cdn.sendfox.com/js/form.js"></script>
         """)
+    }
+
+    @Test("Mailchimp form uses correct endpoint and form ID", .publishingContext())
+    func mailchimpForm() async throws {
+        let element = SubscribeForm(.mailchimp(username: "user", uValue: "abc", listID: "123"))
+        let output = element.markupString()
+        #expect(output.contains("action=\"https://user.us1.list-manage.com/subscribe/post?u=abc&id=123\""))
+        #expect(output.contains("id=\"mc-embedded-subscribe-form\""))
+        #expect(output.contains("name=\"mc-embedded-subscribe-form\""))
+    }
+
+    @Test("Kit form uses correct endpoint and email field name", .publishingContext())
+    func kitForm() async throws {
+        let element = SubscribeForm(.kit("myToken"))
+        let output = element.markupString()
+        #expect(output.contains("action=\"https://app.convertkit.com/forms/myToken/subscriptions\""))
+        #expect(output.contains("name=\"email_address\""))
+    }
+
+    @Test("Buttondown form uses correct endpoint and form class", .publishingContext())
+    func buttondownForm() async throws {
+        let element = SubscribeForm(.buttondown("myuser"))
+        let output = element.markupString()
+        #expect(output.contains("action=\"https://buttondown.com/api/emails/embed-subscribe/myuser\""))
+        #expect(output.contains("embeddable-buttondown-form"))
+    }
+
+    @Test("Custom subscribe button label renders correctly", .publishingContext())
+    func customButtonLabel() async throws {
+        let element = SubscribeForm(.sendFox(listID: "x", formID: "y"))
+            .subscribeButtonLabel("Join Now")
+        let output = element.markupString()
+        #expect(output.contains(">Join Now</button>"))
+    }
+
+    // MARK: - Form style
+
+    @Test("Stacked form style changes layout to vertical", .publishingContext())
+    func stackedFormStyle() async throws {
+        let element = SubscribeForm(.sendFox(listID: "x", formID: "y"))
+            .formStyle(.stacked)
+        let output = element.markupString()
+        #expect(output.contains("col-md-12"))
+        #expect(output.contains("w-100"))
+    }
+
+    // MARK: - Control size
+
+    @Test("Small control size adds small classes", .publishingContext())
+    func smallControlSize() async throws {
+        let element = SubscribeForm(.sendFox(listID: "x", formID: "y"))
+            .controlSize(.small)
+        let output = element.markupString()
+        #expect(output.contains("form-control-sm"))
+        #expect(output.contains("btn-sm"))
+    }
+
+    @Test("Large control size adds large classes", .publishingContext())
+    func largeControlSize() async throws {
+        let element = SubscribeForm(.sendFox(listID: "x", formID: "y"))
+            .controlSize(.large)
+        let output = element.markupString()
+        #expect(output.contains("form-control-lg"))
+        #expect(output.contains("btn-lg"))
+    }
+
+    // MARK: - Button customization
+
+    @Test("Custom button role changes button class", .publishingContext())
+    func customButtonRole() async throws {
+        let element = SubscribeForm(.sendFox(listID: "x", formID: "y"))
+            .subscribeButtonRole(.danger)
+        let output = element.markupString()
+        #expect(output.contains("btn-danger"))
+        #expect(!output.contains("btn-primary"))
+    }
+
+    // MARK: - Provider-specific behavior
+
+    @Test("Mailchimp form includes honeypot field with correct name", .publishingContext())
+    func mailchimpHoneypot() async throws {
+        let element = SubscribeForm(.mailchimp(username: "user", uValue: "abc", listID: "123"))
+        let output = element.markupString()
+        #expect(output.contains("name=\"b_abc_123\""))
+        #expect(output.contains("aria-hidden=\"true\""))
+    }
+
+    @Test("Kit form has no honeypot field and no external script", .publishingContext())
+    func kitNoHoneypotNoScript() async throws {
+        let element = SubscribeForm(.kit("myToken"))
+        let output = element.markupString()
+        #expect(!output.contains("aria-hidden"))
+        #expect(!output.contains("<script"))
     }
 }

@@ -104,7 +104,7 @@ public struct Link: InlineElement, NavigationItem, DropdownItem {
     /// Creates a `Link` wrapping the provided content and pointing to the path
     /// of the `Article` instance you provide.
     /// - Parameters:
-    ///   - content: A piece of content from your site.
+    ///   - article: An article in your site.
     ///   - content: The user-facing content to show inside the `Link`.
     public init(
         target article: Article,
@@ -138,7 +138,7 @@ public struct Link: InlineElement, NavigationItem, DropdownItem {
     /// path of the `Article` instance you provide.
     /// - Parameters:
     ///    - content: The user-facing content to show inside the `Link`.
-    ///    - article: A piece of content from your site.
+    ///    - target: An article in your site.
     public init(_ content: String, target: Article) {
         self.content = content
         self.url = target.path
@@ -257,7 +257,7 @@ public struct Link: InlineElement, NavigationItem, DropdownItem {
             return Markup()
         }
 
-        let path = publishingContext.path(for: url)
+        let path = publishingContext.linkPath(for: url)
         linkAttributes.append(customAttributes: .init(name: "href", value: path))
         let contentHTML = content.markupString()
         return Markup("<a\(linkAttributes)>\(contentHTML)</a>")

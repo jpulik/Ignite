@@ -6,12 +6,13 @@
 //
 
 /// A concrete type used for style resolution that only holds attributes
-@MainActor public struct StyledHTML {
+public struct StyledHTML {
     /// A collection of styles, classes, and attributes.
     var attributes = CoreAttributes()
 
     /// Adds inline styles to the element.
-    /// - Parameter values: Variable number of `InlineStyle` objects
+    /// - Parameter property: The CSS property to apply.
+    /// - Parameter value: Variable number of `InlineStyle` objects.
     /// - Returns: The modified `HTML` element
     public func style(_ property: Property, _ value: String) -> Self {
         var copy = self

@@ -5,17 +5,30 @@
 //  See LICENSE for license information.
 //
 
-import Foundation
 import Testing
 
 @testable import Ignite
 
 /// Tests for the `DoubleClickModifier` modifier.
 @Suite("DoubleClickModifier Tests")
-@MainActor
 class DoubleClickModifierTests: IgniteTestSuite {
-    @Test("ExampleTest")
-    func example() async throws {
+    @Test("onDoubleClick adds ondblclick attribute to HTML element", .publishingContext())
+    func onDoubleClickAddsAttribute() async throws {
+        let element = Text("Double tap me")
+            .onDoubleClick { ShowAlert(message: "Double") }
 
+        let output = element.markupString()
+
+        #expect(output.contains(#"ondblclick="alert('Double')"#))
+    }
+
+    @Test("onDoubleClick adds ondblclick attribute to inline element", .publishingContext())
+    func onDoubleClickInlineElement() async throws {
+        let element = Emphasis("Double click me")
+            .onDoubleClick { ShowAlert(message: "Dbl") }
+
+        let output = element.markupString()
+
+        #expect(output.contains(#"ondblclick="alert('Dbl')"#))
     }
 }

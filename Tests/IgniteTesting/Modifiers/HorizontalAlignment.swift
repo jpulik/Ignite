@@ -12,9 +12,8 @@ import Testing
 
 /// Tests for the `HorizontalAlignment` modifier.
 @Suite("HorizontalAlignment Tests")
-@MainActor
 struct HorizontalAlignmentTests {
-    @Test("Text", arguments: zip(
+    @Test("Text", .publishingContext(), arguments: zip(
         [HorizontalAlignment.leading, .center, .trailing],
         ["text-start", "text-center", "text-end"]))
     func allAlignmentsForText(alignment: HorizontalAlignment, cssClass: String) async throws {
@@ -23,7 +22,7 @@ struct HorizontalAlignmentTests {
         #expect(output == "<p class=\"\(cssClass)\">Hello world!</p>")
     }
 
-    @Test("Text with medium responsive breakpoint", arguments: zip(
+    @Test("Text with medium responsive breakpoint", .publishingContext(), arguments: zip(
         [HorizontalAlignment.leading, .center, .trailing],
         ["text-md-start", "text-md-center", "text-md-end"]))
     func allAlignmentsForTextResponsiveMedium(alignment: HorizontalAlignment, cssClass: String) async throws {
@@ -32,7 +31,7 @@ struct HorizontalAlignmentTests {
         #expect(output == "<p class=\"\(cssClass)\">Hello world!</p>")
     }
 
-    @Test("Text with all responsive breakpoints", arguments: zip(
+    @Test("Text with all responsive breakpoints", .publishingContext(), arguments: zip(
         [HorizontalAlignment.leading, .center, .trailing],
         ["text-start",
          "text-center",
@@ -52,7 +51,7 @@ struct HorizontalAlignmentTests {
         #expect(output == "<p class=\"\(cssClass)\">Hello world!</p>")
     }
 
-    @Test("Text with mixed responsive breakpoints")
+    @Test("Text with mixed responsive breakpoints", .publishingContext())
     func allAlignmentsForTextResponsiveMixed() async throws {
         let element = Text("Hello world!")
             .horizontalAlignment(.responsive(small: .leading, medium: .center, large: .trailing))
@@ -60,7 +59,7 @@ struct HorizontalAlignmentTests {
         #expect(output == "<p class=\"text-start text-md-center text-lg-end\">Hello world!</p>")
     }
 
-    @Test("Column", arguments: zip(
+    @Test("Column", .publishingContext(), arguments: zip(
         [HorizontalAlignment.leading, .center, .trailing],
         ["text-start", "text-center", "text-end"]))
     func allAlignmentsForColumn(alignment: HorizontalAlignment, cssClass: String) async throws {
@@ -80,7 +79,7 @@ struct HorizontalAlignmentTests {
         """)
     }
 
-    @Test("Column with mixed responsive breakpoints")
+    @Test("Column with mixed responsive breakpoints", .publishingContext())
     func allAlignmentsForColumnResponsiveMixed() async throws {
         let element = Column {
             ControlLabel("Left Label")
@@ -94,5 +93,23 @@ struct HorizontalAlignmentTests {
         <td colspan=\"1\" class=\"text-start text-md-center text-lg-end\">\
         <label>Left Label</label><label>Right Label</label></td>
         """)
+    }
+
+    @Test("Container alignment classes", .publishingContext(), arguments: zip(
+        [HorizontalAlignment.leading, .center, .trailing],
+        ["justify-content-start", "justify-content-center", "justify-content-end"]))
+    func containerAlignmentClasses(
+        alignment: HorizontalAlignment,
+        expectedClass: String
+    ) async throws {
+        #expect(alignment.containerAlignmentClass == expectedClass)
+    }
+
+    @Test("All cases are equatable", .publishingContext())
+    func allCasesAreEquatable() async throws {
+        #expect(HorizontalAlignment.leading == HorizontalAlignment.leading)
+        #expect(HorizontalAlignment.center == HorizontalAlignment.center)
+        #expect(HorizontalAlignment.trailing == HorizontalAlignment.trailing)
+        #expect(HorizontalAlignment.leading != HorizontalAlignment.trailing)
     }
 }

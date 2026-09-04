@@ -12,9 +12,8 @@ import Testing
 
 /// Tests for the `HStack` element.
 @Suite("HStack Tests")
-@MainActor
 class HStackTests: IgniteTestSuite {
-    @Test("HStack with elements")
+    @Test("HStack with elements", .publishingContext())
     func basicHStack() async throws {
         let element = HStack(alignment: .top) {
             ControlLabel("Top Label")
@@ -30,7 +29,7 @@ class HStackTests: IgniteTestSuite {
         """)
     }
 
-    @Test("HStack with elements and spacing")
+    @Test("HStack with elements and spacing", .publishingContext())
     func elementsWithSpacingWithinHStack() async throws {
         let element = HStack(spacing: 10) {
             ControlLabel("Top Label")
@@ -44,5 +43,34 @@ class HStackTests: IgniteTestSuite {
         <label class="mb-0 align-self-center">Bottom Label</label>\
         </div>
         """)
+    }
+
+    @Test("HStack with bottom alignment uses align-self-end", .publishingContext())
+    func bottomAlignment() async throws {
+        let element = HStack(alignment: .bottom) {
+            ControlLabel("Item")
+        }
+        let output = element.markupString()
+        #expect(output.contains("align-self-end"))
+    }
+
+    @Test("HStack with semantic spacing uses gap class", .publishingContext())
+    func semanticSpacing() async throws {
+        let element = HStack(spacing: .large) {
+            ControlLabel("Item")
+        }
+        let output = element.markupString()
+        #expect(output.contains("gap-4"))
+    }
+
+    @Test("HStack with spacing none omits gap class", .publishingContext())
+    func spacingNone() async throws {
+        let element = HStack(spacing: .none) {
+            ControlLabel("Item")
+        }
+        let output = element.markupString()
+        #expect(output.contains("hstack"))
+        #expect(!output.contains("gap-"))
+        #expect(!output.contains("gap:"))
     }
 }

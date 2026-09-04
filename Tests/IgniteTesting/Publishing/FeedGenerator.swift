@@ -10,18 +10,46 @@ import Testing
 
 @testable import Ignite
 
+enum FeedSite: Sendable {
+    case standard
+    case gmt
+    case est
+
+    static let all: [Self] = [.standard, .gmt, .est]
+
+    var site: TestSite {
+        switch self {
+        case .standard:
+            TestSite()
+        case .gmt:
+            TestSite(timeZone: .init(abbreviation: "GMT")!)
+        case .est:
+            TestSite(timeZone: .init(abbreviation: "EST")!)
+        }
+    }
+}
+
 /// Tests for the `FeedGenerator` type.
 @Suite("FeedGenerator Tests")
-@MainActor
 struct FeedGeneratorTests {
-    static let sites: [any Site] = [
-        TestSite(),
-        TestSite(timeZone: .init(abbreviation: "GMT")!),
-        TestSite(timeZone: .init(abbreviation: "EST")!)
-    ]
+    @Test("XML-escapes special characters in titles", .publishingContext())
+    func xmlEscapesSpecialCharacters() async throws {
+        let site = TestSite()
+        let config = site.feedConfiguration!
+        var article = Article()
+        article.title = "Donations & Sponsorships"
+        article.description = "Example Description"
 
-    @Test("generateFeed()", arguments: await sites)
-    func generateFeed(for site: any Site) async throws {
+        let generator = FeedGenerator(config: config, site: site, content: [article])
+        let feed = generator.generateFeed()
+
+        #expect(feed.contains("<title>Donations &amp; Sponsorships</title>"))
+        #expect(!feed.contains("<title>Donations & Sponsorships</title>"))
+    }
+
+    @Test("generateFeed()", .publishingContext(), arguments: FeedSite.all)
+    func generateFeed(for siteCase: FeedSite) async throws {
+        let site = siteCase.site
         let config = site.feedConfiguration!
         let feedHref = site.url.appending(path: config.path).absoluteString
         var exampleContent = Article()

@@ -5,7 +5,6 @@
 // See LICENSE for license information.
 //
 
-@MainActor
 struct FeedGenerator {
     var feedConfig: FeedConfiguration
     var site: any Site
@@ -25,7 +24,7 @@ struct FeedGenerator {
             result += """
             <image>\
             <url>\(image.url)</url>\
-            <title>\(site.name)</title>\
+            <title>\(site.name.escapedForXML())</title>\
             <link>\(site.url.absoluteString)</link>\
             <width>\(image.width)</width>\
             <height>\(image.height)</height>\
@@ -49,7 +48,7 @@ struct FeedGenerator {
                 var itemXML = """
                 <item>\
                 <guid isPermaLink="true">\(item.path(in: site))</guid>\
-                <title>\(item.title)</title>\
+                <title>\(item.title.escapedForXML())</title>\
                 <link>\(item.path(in: site))</link>\
                 <description><![CDATA[\(item.description)]]></description>\
                 <pubDate>\(item.date.asRFC822(timeZone: site.timeZone))</pubDate>
@@ -86,8 +85,8 @@ struct FeedGenerator {
         xmlns:atom="http://www.w3.org/2005/Atom" \
         xmlns:content="http://purl.org/rss/1.0/modules/content/">\
         <channel>\
-        <title>\(site.name)</title>\
-        <description>\(site.description ?? "")</description>\
+        <title>\(site.name.escapedForXML())</title>\
+        <description>\((site.description ?? "").escapedForXML())</description>\
         <link>\(site.url.absoluteString)</link>\
         <atom:link
             href="\(site.url.appending(path: feedConfig.path).absoluteString)"

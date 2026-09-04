@@ -5,17 +5,20 @@
 //  See LICENSE for license information.
 //
 
-import Foundation
 import Testing
 
 @testable import Ignite
 
 /// Tests for the `DismissModal` action.
 @Suite("DismissModal Tests")
-@MainActor
 class DismissModalTests: IgniteTestSuite {
-    @Test("ExampleTest")
-    func example() async throws {
+    @Test("compile() injects the provided modal ID and hide flow", .publishingContext())
+    func compilesWithProvidedID() async throws {
+        let action = DismissModal(id: "modal-42")
+        let output = action.compile()
 
+        #expect(output.contains("document.getElementById('modal-42')"))
+        #expect(output.contains("bootstrap.Modal.getInstance(modal)"))
+        #expect(output.contains("if (modalInstance) { modalInstance.hide(); }"))
     }
 }

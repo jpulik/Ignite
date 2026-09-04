@@ -12,9 +12,8 @@ import Testing
 
 /// Tests for the `AnimationModifier` modifier.
 @Suite("AnimationModifier Tests")
-@MainActor
 class AnimationModifierTests: IgniteTestSuite {
-    @Test("HMTL Animation should bounce")
+    @Test("HMTL Animation should bounce", .publishingContext())
     func htmlAnimationModifierBounce() async throws {
         let element = Text {
             Span("This is a Span")
@@ -48,5 +47,24 @@ class AnimationModifierTests: IgniteTestSuite {
             // Record an issue to fail the test with a descriptive message
             Issue.record("Failed to create regular expression: \(error)")
         }
+    }
+
+    @Test("Click trigger produces onclick handler", .publishingContext())
+    func clickTrigger() async throws {
+        let element = Text("Click me").animation(Animation.bounce, on: .click)
+        let output = element.markupString()
+
+        #expect(output.contains("igniteToggleClickAnimation(this)"))
+        #expect(output.contains("onclick"))
+    }
+
+    @Test("Appear trigger produces animation class without hover suffix", .publishingContext())
+    func appearTrigger() async throws {
+        let element = Text("Appear").animation(Animation.bounce, on: .appear)
+        let output = element.markupString()
+
+        #expect(output.contains("animation-"))
+        #expect(!output.contains("-hover"))
+        #expect(!output.contains("onclick"))
     }
 }
