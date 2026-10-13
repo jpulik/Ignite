@@ -19,6 +19,10 @@ public struct MarkdownToHTML: ArticleRenderer, MarkupVisitor {
     /// The body text of this file, which includes its title by default.
     public var body = ""
 
+    // Preserve plain feed text before HTML escaping obscures the original characters.
+    var feedTitle = ""
+    var feedDescription = ""
+
     /// Whether to remove the Markdown title from its body. This only applies
     /// to the first heading.
     public var removeTitleFromBody: Bool
@@ -66,10 +70,15 @@ public struct MarkdownToHTML: ArticleRenderer, MarkupVisitor {
     /// - Returns: A HTML <pre> element with <code> inside, marked with
     /// CSS to remember which language was used.
     public func visitCodeBlock(_ codeBlock: Markdown.CodeBlock) -> String {
+        let code = codeBlock.code
+            .replacing("&", with: "&amp;")
+            .replacing("<", with: "&lt;")
+            .replacing(">", with: "&gt;")
+
         if let language = codeBlock.language {
-            #"<pre><code class="language-\#(language.lowercased())">\#(codeBlock.code)</code></pre>"#
+            return #"<pre><code class="language-\#(language.lowercased())">\#(code)</code></pre>"#
         } else {
-            #"<pre><code>\#(codeBlock.code)</code></pre>"#
+            return #"<pre><code>\#(code)</code></pre>"#
         }
     }
 
@@ -115,6 +124,7 @@ public struct MarkdownToHTML: ArticleRenderer, MarkupVisitor {
         // If we don't already have a document title, use this as the document's title.
         if title.isEmpty {
             title = headingContent
+            feedTitle = feedText(for: heading)
 
             // If we're stripping the title from the rendered body, send back nothing here.
             if removeTitleFromBody {
@@ -138,8 +148,9 @@ public struct MarkdownToHTML: ArticleRenderer, MarkupVisitor {
     /// appends Bootstrap's `img-fluid` CSS class so that images resize.
     public func visitImage(_ image: Markdown.Image) -> String {
         if let source = image.source {
-            let title = image.plainText
-            return #"<img src="\#(source)" alt="\#(title)" class="img-fluid">"#
+            // Markdown has already decoded entities, so escape both values before writing HTML attributes.
+            let title = image.plainText.escapedForXML()
+            return #"<img src="\#(source.escapedForXML())" alt="\#(title)" class="img-fluid">"#
         } else {
             return ""
         }
@@ -149,7 +160,12 @@ public struct MarkdownToHTML: ArticleRenderer, MarkupVisitor {
     /// - Parameter inlineCode: The inline code markup to process.
     /// - Returns: A HTML <code> tag containing the code.
     mutating public func visitInlineCode(_ inlineCode: Markdown.InlineCode) -> String {
-        "<code>\(inlineCode.code)</code>"
+        let code = inlineCode.code
+            .replacing("&", with: "&amp;")
+            .replacing("<", with: "&lt;")
+            .replacing(">", with: "&gt;")
+
+        return "<code>\(code)</code>"
     }
 
     /// Processes a chunk of inline HTML markup.
@@ -187,11 +203,12 @@ public struct MarkdownToHTML: ArticleRenderer, MarkupVisitor {
         return result
     }
 
-    /// Processes unordered list markup.
-    /// - Parameter orderedList: The unordered list markup to process.
+    /// Processes ordered list markup.
+    /// - Parameter orderedList: The ordered list markup to process.
     /// - Returns: A HTML <ol> element with the correct contents.
     mutating public func visitOrderedList(_ orderedList: Markdown.OrderedList) -> String {
-        var result = "<ol>"
+        // The first marker sets the start; omit the default to preserve ordinary list markup.
+        var result = orderedList.startIndex == 1 ? "<ol>" : "<ol start=\"\(orderedList.startIndex)\">"
 
         for listItem in orderedList.listItems {
             result += visit(listItem)
@@ -222,6 +239,7 @@ public struct MarkdownToHTML: ArticleRenderer, MarkupVisitor {
 
         if description.isEmpty {
             description = paragraphContents
+            feedDescription = feedText(for: paragraph)
         }
 
         if paragraph.isInsideList == false {
@@ -320,9 +338,13 @@ public struct MarkdownToHTML: ArticleRenderer, MarkupVisitor {
 
     /// Processes plain text markup.
     /// - Parameter text: The plain text markup to process.
-    /// - Returns: The same text that was read as input.
+    /// - Returns: The parsed text escaped for HTML content.
     mutating public func visitText(_ text: Markdown.Text) -> String {
+        // The parser has decoded Markdown escapes and entities. Raw HTML uses its own visitors.
         text.plainText
+            .replacing("&", with: "&amp;")
+            .replacing("<", with: "&lt;")
+            .replacing(">", with: "&gt;")
     }
 
     /// Process thematic break markup. This is written as --- in Markdown.
@@ -344,5 +366,24 @@ public struct MarkdownToHTML: ArticleRenderer, MarkupVisitor {
 
         result += "</ul>"
         return result
+    }
+
+    /// Extracts feed text from syntax nodes without decoding ordinary text a second time.
+    /// Code remains literal; formatting, images, and hard breaks contribute no HTML tags.
+    private func feedText(for markup: Markdown.Markup) -> String {
+        switch markup {
+        case let code as Markdown.InlineCode:
+            code.code
+        case let text as Markdown.Text:
+            text.plainText
+        case let html as Markdown.InlineHTML:
+            html.rawHTML.strippingTags()
+        case is Markdown.Image, is Markdown.LineBreak:
+            ""
+        case is Markdown.SoftBreak:
+            " "
+        default:
+            markup.children.map { feedText(for: $0) }.joined()
+        }
     }
 }
